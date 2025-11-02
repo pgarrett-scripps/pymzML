@@ -2,6 +2,18 @@
 requires = ["hatchling", "versioningit"]
 build-backend = "hatchling.build"
 
+[tool.uv]
+dev-dependencies = [
+    'cython',
+    'coverage >= 4.2',
+    'codecov',
+    'pytest',
+    'tox',
+    'sphinx',
+    'sphinx_rtd_theme',
+    'numpydoc==1.9.0',
+]
+
 [project]
 name = "pymzml"
 description = "high-throughput mzML parsing"
@@ -15,7 +27,7 @@ authors = [
     { name = 'C. Fufezan', email = 'christian@fufezan.net' }
 ]
 urls = { Homepage = 'https://pymzml.github.com' }
-requires-python = ">=3.7.0"
+requires-python = ">=3.9"
 readme = "README.rst"
 license = { text = 'The MIT license' }
 classifiers = [
@@ -37,7 +49,6 @@ classifiers = [
 ]
 dependencies = [
     'numpy >= 1.8.0',
-    'regex',
 ]
 dynamic = ["version"]
 

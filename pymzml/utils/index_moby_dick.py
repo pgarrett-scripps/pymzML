@@ -41,7 +41,7 @@ response = urllib.request.urlopen(moby_dick_url)
 moby_dick_txt = response.read().decode("utf-8").split("\n")
 
 
-def index_by_chapter(txt):
+def index_by_chapter(txt: str):
     """
     Iterate the text file while collecting the data for each chapter and compressing it
 
@@ -56,9 +56,11 @@ def index_by_chapter(txt):
         max_offset_len=6,
         output_path="./Moby_Dick_indexed.gz",
     )
+    
 
     with general_seekable_gzip_writer as index_writer:
-        current_chapter = ""
+        current_chapter: str = ""
+        current_chapter_number: int = 0
         for line in txt:
             if re.match(chapter_start, line):
                 match = re.match(chapter_start, line)

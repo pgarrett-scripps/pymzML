@@ -13,12 +13,12 @@ import gzip
 
 
 class TestRound(unittest.TestCase):
-    def _check_rounding(self, test, expected):
-        assert round(test) == expected
-
     def test_rounding(self):
-        for x, y in [(1, 1), (1.9, 2)]:
-            yield self._check_rounding, x, y
+        """Test rounding functionality"""
+        test_cases = [(1, 1), (1.9, 2)]
+        for test_value, expected in test_cases:
+            with self.subTest(test_value=test_value, expected=expected):
+                self.assertEqual(round(test_value), expected)
 
 
 class TestOboVersion(unittest.TestCase):
@@ -51,7 +51,7 @@ class TestOboVersion(unittest.TestCase):
         for fn in self.obo_files:
             v = self._get_file_version(os.path.join(self.obodir, fn))
             _v = fn[7:-7].strip()
-            yield self._check_version, v, _v
+            self._check_version(v, _v)
 
 
 if __name__ == "__main__":

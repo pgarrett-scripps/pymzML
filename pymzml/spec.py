@@ -52,8 +52,16 @@ from collections import defaultdict as ddict
 from functools import lru_cache
 from operator import itemgetter as itemgetter
 from struct import unpack
+from typing import Optional, List, Tuple, Dict, Any, Union, Set
 
-import numpy as np
+try:
+    import numpy as np
+    from numpy.typing import NDArray
+    HAS_NUMPY = True
+except (ImportError, ModuleNotFoundError):
+    HAS_NUMPY = False
+    np = None
+    NDArray = None  # type: ignore
 
 try:
     DECON_DEP = True
@@ -83,6 +91,8 @@ class MS_Spectrum(MsData):
     def _read_accessions(self):
         """Set all required variables for this spectrum."""
         self.accessions = {}
+        if self.element is None:
+            raise ValueError("Spectrum element is None.")
         for element in self.element.iter():
             accession = element.get("accession")
             name = element.get("name")
@@ -91,7 +101,7 @@ class MS_Spectrum(MsData):
         if "profile spectrum" in self.accessions.keys():
             self._profile = True
 
-    def get_element_by_name(self, name):
+    def get_element_by_name(self, name: str) -> Optional[ElementTree.Element]:
         """
         Get element from the original tree by it's unit name.
 
@@ -102,6 +112,8 @@ class MS_Spectrum(MsData):
             obo_version (str, optional): obo version number.
 
         """
+        if self.element is None:
+            raise ValueError("Spectrum element is None.")
         iterator = self.element.iter()
         return_ele = None
         for ele in iterator:
@@ -110,7 +122,7 @@ class MS_Spectrum(MsData):
                 break
         return return_ele
 
-    def get_element_by_path(self, hooks):
+    def get_element_by_path(self, hooks: List[str]) -> Optional[List[ElementTree.Element]]:
         """
         Find elements in spectrum by its path.
 
@@ -135,11 +147,13 @@ class MS_Spectrum(MsData):
             for hook in hooks:
                 path_array.append("{ns}{hook}".format(ns=self.ns, hook=hook))
             path = "/".join(path_array)
+            if self.element is None:
+                raise ValueError("Spectrum element is None.")
             return_ele = self.element.findall(path)
 
         return return_ele
 
-    def _register(self, decoded_tuple):
+    def _register(self, decoded_tuple: Tuple[str, Union[NDArray, Tuple]]) -> None:
         d_type, array = decoded_tuple
         if d_type == "mz":
             self._mz = array
@@ -150,7 +164,7 @@ class MS_Spectrum(MsData):
         else:
             raise Exception("Unknown data Type ({0})".format(d_type))
 
-    def _get_encoding_parameters(self, array_type):
+    def _get_encoding_parameters(self, array_type: str) -> Tuple[bytes, str, Optional[str], List[str]]:
         """
         Find the correct parameter for decoding and return them as tuple.
 
@@ -344,7 +358,7 @@ class MS_Spectrum(MsData):
             ret_data = []
         return ret_data
 
-    def _decodeNumpress_to_array(self, data, compression):
+    def _decodeNumpress_to_array(self, data: bytes, compression: List[str]) -> List[float]:
         """
         Decode golomb-rice encoded data (aka numpress encoded data).
 
@@ -357,7 +371,7 @@ class MS_Spectrum(MsData):
             array (list): Returns the unpacked data as an array of floats.
 
         """
-        result = []
+        result: List[float] = []
         comp_ms_tags = [self.calling_instance.OT[comp]["id"] for comp in compression]
         data = np.frombuffer(data, dtype=np.uint8)
         if "MS:1002312" in comp_ms_tags:
@@ -380,7 +394,7 @@ class MS_Spectrum(MsData):
         """
         return np.median(data)
 
-    def to_string(self, encoding="latin-1", method="xml"):
+    def to_string(self, encoding: str = "latin-1", method: str = "xml") -> Tuple[str, List]:
         """
         Return string representation of the xml element the
         spectrum was initialized with.
@@ -411,38 +425,18 @@ class Spectrum(MsData):
 
     def __init__(
         self,
-        element=ElementTree.Element(""),
-        measured_precision=5e-6,
+        element: ElementTree.Element = ElementTree.Element(""),
+        measured_precision: float = 5e-6,
         *,
-        obo_version=None,
-    ):
-        __slots__ = [
-            "_centroided_peaks",
-            "_centroided_peaks_sorted_by_i",
-            "_deconvoluted_peaks",
-            "_extreme_values",
-            "_i",
-            "_ID",
-            "_id_dict",
-            "_index",
-            "_measured_precision",
-            "_peaks",
-            "_profile",
-            "_reprofiled_peaks",
-            "_t_mass_set",
-            "_t_mz_set",
-            "_time",
-            "_transformed_mass_with_error",
-            "_transformed_mz_with_error",
-            "_transformed_peaks" "calling_instance" "element",
-            "internal_precision" "noise_level_estimate",
-            "selected_precursors",
-        ]
-
+        obo_version: Optional[str] = None,
+    ) -> None:
+        # Call parent class __init__
+        super().__init__(element, measured_precision, obo_version=obo_version)
+        
+        # Spectrum-specific attributes
         self._centroided_peaks = None
         self._centroided_peaks_sorted_by_i = None
         self._extreme_values = None
-        self._i = None
         self._ID = None
         self._id_dict = None
         self._index = None
@@ -455,7 +449,6 @@ class Spectrum(MsData):
             "deconvoluted": None,
         }
         self._selected_precursors = None
-        self._profile = None
         self.reprofiled = False
         self._reprofiled_peaks = None
         self._scan_time = None
@@ -468,31 +461,16 @@ class Spectrum(MsData):
         self._transformed_mass_with_error = None
         self._transformed_mz_with_error = None
         self._transformed_peaks = None
-        self.obo_translator = OboTranslator.from_cache(obo_version)
-        self.element = element
-        self.measured_precision = measured_precision
-        self.noise_level_estimate = {}
-
-        self.ns = ""
-        if self.element:
-            self.ns = (
-                re.match(r"\{.*\}", element.tag).group(0)
-                if re.match(r"\{.*\}", element.tag)
-                else ""
-            )
-
-        self._decode = self._decode_to_numpy
-        self._array = np.array
         self._ms_deisotop_warning_printed = False
 
-    def __del__(self):
+    def __del__(self) -> None:
         """
         Clear self.element to limit RAM usage
         """
-        if self.element:
+        if self.element is not None:
             self.element.clear()
 
-    def __add__(self, other_spec):
+    def __add__(self, other_spec: 'Spectrum') -> 'Spectrum':
         """
         Adds two pymzml spectra
 
@@ -518,7 +496,7 @@ class Spectrum(MsData):
         """
         assert isinstance(other_spec, Spectrum)
         if self._peak_dict["reprofiled"] is None:
-            reprofiled = self._reprofile_Peaks()
+            reprofiled: Dict[float, float] = self._reprofile_Peaks()
             self.set_peaks(reprofiled, "reprofiled")
         if other_spec._peak_dict["reprofiled"] is None:
             other_spec.set_peaks(other_spec._reprofile_Peaks(), "reprofiled")
@@ -526,7 +504,7 @@ class Spectrum(MsData):
             self._peak_dict["reprofiled"][mz] += i
         return self
 
-    def __sub__(self, other_spec):
+    def __sub__(self, other_spec: 'Spectrum') -> 'Spectrum':
         """
         Subtracts two pymzml spectra.
 
@@ -548,7 +526,7 @@ class Spectrum(MsData):
         self.set_peaks(None, "raw")
         return self
 
-    def __mul__(self, value):
+    def __mul__(self, value: Union[int, float]) -> 'Spectrum':
         """
         Multiplies each intensity with a float, i.e. scales the spectrum.
 
@@ -579,7 +557,7 @@ class Spectrum(MsData):
                 self._peak_dict["reprofiled"][mz] *= float(value)
         return self
 
-    def __truediv__(self, value):
+    def __truediv__(self, value: Union[int, float]) -> 'Spectrum':
         """
         Divides each intensity by a float, i.e. scales the spectrum.
 
@@ -611,13 +589,13 @@ class Spectrum(MsData):
             self._peak_dict["centroided"] = peaks
         return self
 
-    def __div__(self, value):
+    def __div__(self, value: Union[int, float]) -> 'Spectrum':
         """
         Integer division is the same as __truediv__ for this class
         """
         return self.__truediv__(value)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """
         Returns representative string for a spectrum object class
         """
@@ -625,7 +603,7 @@ class Spectrum(MsData):
             self.ID, hex(id(self))
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         """
         Returns representative string for a spectrum object class
         """
@@ -634,7 +612,7 @@ class Spectrum(MsData):
         )
 
     @lru_cache()
-    def __getitem__(self, accession):
+    def __getitem__(self, accession: str) -> Optional[Union[str, float, bool, List[Union[str, float]]]]:
         """
         Access spectrum XML information by tag name
 
@@ -673,19 +651,19 @@ class Spectrum(MsData):
             return_val = True
         return return_val
 
-    def get(self, acc, default=None):
+    def get(self, acc: str, default: Any = None) -> Any:
         """Mimic dicts get function.
 
         Args:
             acc (str): accession or obo tag to return
             default (None, optional): default value if acc is not found
         """
-        val = self[acc]
+        val: Any = self[acc]
         if val is None:
             val = default
         return val
 
-    def __contains__(self, value):
+    def __contains__(self, value: str) -> bool:
         """Check if MS tag or name can be found in spectrum.
 
         Args:
@@ -700,7 +678,7 @@ class Spectrum(MsData):
         return r
 
     @property
-    def measured_precision(self):
+    def measured_precision(self) -> float:
         """
         Sets the measured and internal precision
 
@@ -710,13 +688,13 @@ class Spectrum(MsData):
         return self._measured_precision
 
     @measured_precision.setter
-    def measured_precision(self, value):
+    def measured_precision(self, value: float) -> None:
         self._measured_precision = value
         self.internal_precision = int(round(50000.0 / (value * 1e6)))
         return
 
     @property
-    def t_mz_set(self):
+    def t_mz_set(self) -> Set[int]:
         """
         Creates a set of integers out of transformed m/z values
         (including all values in the defined imprecision).
@@ -748,7 +726,7 @@ class Spectrum(MsData):
         return self._t_mz_set
 
     @property
-    def transformed_mz_with_error(self):
+    def transformed_mz_with_error(self) -> Dict[int, List[Tuple[float, float]]]:
         """
         Returns transformed m/z value with error
 
@@ -780,7 +758,7 @@ class Spectrum(MsData):
         return self._transformed_mz_with_error
 
     @property
-    def transformed_peaks(self):
+    def transformed_peaks(self) -> List[Tuple[int, float]]:
         """
         m/z value is multiplied by the internal precision.
 
@@ -797,7 +775,7 @@ class Spectrum(MsData):
         return self._transformed_peaks
 
     @property
-    def TIC(self):
+    def TIC(self) -> float:
         """
         Property to access the total ion current for this spectrum.
 
@@ -813,7 +791,7 @@ class Spectrum(MsData):
         return self._TIC
 
     @property
-    def ID(self):
+    def ID(self) -> Optional[Union[int, str]]:
         """
         Access the native id (last number in the id attribute) of the spectrum.
 
@@ -821,7 +799,7 @@ class Spectrum(MsData):
             ID (str): native ID of the spectrum
         """
         if self._ID is None:
-            if self.element:
+            if self.element is not None:
                 match = regex_patterns.SPECTRUM_ID_PATTERN.search(
                     self.element.get("id", None)
                 )
@@ -835,7 +813,7 @@ class Spectrum(MsData):
         return self._ID
 
     @property
-    def id_dict(self):
+    def id_dict(self) -> Dict[str, Union[str, int]]:
         """
         Access to all entries stored the id attribute of a spectrum.
 
@@ -844,12 +822,15 @@ class Spectrum(MsData):
         """
         if self._id_dict is None:
             tuples = []
-            match = regex_patterns.SPECTRUM_PATTERN3.match(self.element.attrib["id"])
-            if match is not None:
-                captures = match.captures(1)
-                for element in captures:
-                    k, v = element.strip().split("=")
-                    v = int(v)
+            matches = regex_patterns.SPECTRUM_PATTERN3.findall(self.element.attrib["id"])
+            if matches:
+                for k, v in matches:
+                    k = k.strip()
+                    v = v.strip()
+                    try:
+                        v = int(v)
+                    except ValueError:
+                        pass
                     tuples.append([k, v])
                 self._id_dict = dict(tuples)
             else:
@@ -857,7 +838,7 @@ class Spectrum(MsData):
         return self._id_dict
 
     @property
-    def index(self):
+    def index(self) -> Optional[Union[int, str]]:
         """
         Access the index of the spectrum.
 
@@ -876,7 +857,7 @@ class Spectrum(MsData):
         return self._index
 
     @property
-    def ms_level(self):
+    def ms_level(self) -> Optional[int]:
         """
         Property to access the ms level.
 
@@ -894,7 +875,7 @@ class Spectrum(MsData):
         return self._ms_level
 
     @property
-    def scan_time(self):
+    def scan_time(self) -> Tuple[Optional[float], Optional[str]]:
         """
         Property to access the retention time and retention time unit.
         Please note, that we do not assume the retention time unit,
@@ -915,7 +896,7 @@ class Spectrum(MsData):
         return self._scan_time, self._scan_time_unit
 
     # @property
-    def scan_time_in_minutes(self):
+    def scan_time_in_minutes(self) -> Optional[float]:
         """
         Property to access the retention time in minutes.
         If the retention time unit is defined within the mzML,
@@ -940,7 +921,7 @@ class Spectrum(MsData):
         return self._scan_time_in_minutes
 
     @property
-    def selected_precursors(self):
+    def selected_precursors(self) -> List[Dict[str, Any]]:
         """
         Property to access the selected precursors of a MS2 spectrum. Returns
         a list of dicts containing the precursors mz and, if available intensity
@@ -1003,7 +984,7 @@ class Spectrum(MsData):
         return self._selected_precursors
 
     @property
-    def precursors(self):
+    def precursors(self) -> List[str]:
         """
         List the precursor information of this spectrum, if available.
         Returns:
@@ -1022,11 +1003,11 @@ class Spectrum(MsData):
                 )
         return self._precursors
 
-    def remove_precursor_peak(self):
-        peaks = self.peaks("centroided")
+    def remove_precursor_peak(self) -> Union['NDArray', List]:
+        peaks: Union['NDArray', List] = self.peaks("centroided")
         for precursor in self.selected_precursors:
-            mz = precursor["mz"]
-            hp = self.has_peak(mz)
+            mz: float = precursor["mz"]
+            hp: List[Tuple[float, float]] = self.has_peak(mz)
             if hp:
                 for p in hp:
                     peaks = peaks[(peaks[:, 0] != p[0])]
@@ -1035,7 +1016,7 @@ class Spectrum(MsData):
         return peaks
 
     @property
-    def mz(self):
+    def mz(self) -> Union['NDArray', Tuple, List]:
         """
         Returns the list of m/z values. If the m/z values are encoded, the
         function :func:`~spec.MS_Spectrum._decode` is used to decode the encoded data.
@@ -1052,14 +1033,14 @@ class Spectrum(MsData):
         return self._mz
 
     @mz.setter
-    def mz(self, mz_list):
+    def mz(self, mz_list: Union[List[float], 'NDArray']) -> None:
         """"""
         mz_list = np.array(mz_list, dtype=np.float64)
         mz_list.sort()
         self._mz = mz_list
 
     @property
-    def i(self):
+    def i(self) -> Union['NDArray', Tuple, List]:
         """
         Returns the list of the intensity values.
         If the intensity values are encoded, the function :func:`~spec.MS_Spectrum._decode`
@@ -1077,10 +1058,10 @@ class Spectrum(MsData):
         return self._i
 
     @i.setter
-    def i(self, intensity_list):
+    def i(self, intensity_list: Union[List[float], 'NDArray']) -> None:
         self._i = intensity_list
 
-    def peaks(self, peak_type):
+    def peaks(self, peak_type: str) -> Union['NDArray', List[Tuple[float, float]], Dict[float, float]]:
         """
         Decode and return a list of mz/i tuples.
 
@@ -1097,7 +1078,11 @@ class Spectrum(MsData):
                 i_params = self._get_encoding_parameters("intensity array")
                 mz = self._decode(*mz_params)
                 i = self._decode(*i_params)
-                arr = np.stack((mz, i), axis=-1)
+                if HAS_NUMPY:
+                    arr = np.stack((mz, i), axis=-1)
+                else:
+                    # Create list of tuples for non-numpy case
+                    arr = list(zip(mz, i))
                 self._peak_dict[peak_type] = arr
             if peak_type == "raw":
                 pass
@@ -1110,7 +1095,7 @@ class Spectrum(MsData):
             else:
                 raise KeyError
 
-        if not isinstance(self._peak_dict[peak_type], np.ndarray):
+        if HAS_NUMPY and not isinstance(self._peak_dict[peak_type], np.ndarray):
             peaks = self._array(self._peak_dict[peak_type])
         else:
             peaks = self._peak_dict[peak_type]
@@ -1120,29 +1105,29 @@ class Spectrum(MsData):
         return peaks
 
     @lru_cache()
-    def get_array(self, arr_name):
-        array_params = self._get_encoding_parameters(arr_name)
-        array = self._decode(*array_params)
+    def get_array(self, arr_name: str) -> Optional[Union['NDArray', Tuple, List]]:
+        array_params: Tuple[bytes, str, Optional[str], List[str]] = self._get_encoding_parameters(arr_name)
+        array: Union['NDArray', Tuple, List] = self._decode(*array_params)
         if len(array) == 0:
             array = None
             _ = self.get_all_arrays_in_spec(not_found_array=arr_name)
         return array
 
     def get_tims_tof_ion_mobility(
-        self, array_name="mean inverse reduced ion mobility array"
-    ):
-        arr = self.get_array(array_name)
+        self, array_name: str = "mean inverse reduced ion mobility array"
+    ) -> Optional[Union['NDArray', Tuple, List]]:
+        arr: Optional[Union['NDArray', Tuple, List]] = self.get_array(array_name)
         if arr is None:
             _ = self.get_all_arrays_in_spec(not_found_array=array_name)
         return arr
 
-    def get_all_arrays_in_spec(self, not_found_array=None):
-        b_data_string = "./{ns}binaryDataArrayList/{ns}binaryDataArray/{ns}cvParam[@unitCvRef='MS']".format(
+    def get_all_arrays_in_spec(self, not_found_array: Optional[str] = None) -> List[str]:
+        b_data_string: str = "./{ns}binaryDataArrayList/{ns}binaryDataArray/{ns}cvParam[@unitCvRef='MS']".format(
             ns=self.ns
         )
-        b_data_arrays = self.element.findall(b_data_string)
-        array_names = [arr.attrib["name"] for arr in b_data_arrays]
-        formatted_array_names = []
+        b_data_arrays: List[ElementTree.Element] = self.element.findall(b_data_string)
+        array_names: List[str] = [arr.attrib["name"] for arr in b_data_arrays]
+        formatted_array_names: List[str] = []
         for name in array_names:
             formatted_array_names.append("\t- {name}".format(name=name))
         if not_found_array is not None:
@@ -1154,7 +1139,7 @@ class Spectrum(MsData):
             print("\n".join(formatted_array_names))
         return array_names
 
-    def _deconvolute_peaks(self, *args, **kwargs):
+    def _deconvolute_peaks(self, *args: Any, **kwargs: Any) -> Optional['NDArray']:
         if DECON_DEP is True:
             peaks = self.peaks("centroided")
             # pack peak matrix into expected structure
@@ -1173,7 +1158,7 @@ class Spectrum(MsData):
                 )
                 self._ms_deisotop_warning_printed = True
 
-    def set_peaks(self, peaks, peak_type):
+    def set_peaks(self, peaks: Optional[Union['NDArray', List[Tuple[float, float]], Dict[float, float]]], peak_type: str) -> None:
         """
         Assign a custom peak array of type peak_type
 
@@ -1226,7 +1211,7 @@ class Spectrum(MsData):
                 'Choose either "raw", "centroided" or "reprofiled"'
             )
 
-    def _centroid_peaks(self):
+    def _centroid_peaks(self) -> Union['NDArray', List[Tuple[float, float]]]:
         """
         Perform a Gauss fit to centroid the peaks for the property
         centroided_peaks.
@@ -1254,73 +1239,177 @@ class Spectrum(MsData):
             is_profile = None
 
         if is_profile is not None or self.reprofiled:  # check if spec is a profile spec
-            tmp = []
-            if self._peak_dict["reprofiled"] is not None:
-                i_array = [i for mz, i in self.peaks("reprofiled")]
-                mz_array = [mz for mz, i in self.peaks("reprofiled")]
+            # Use numpy-optimized version if available, otherwise fall back to Python implementation
+            if HAS_NUMPY:
+                return self._centroid_peaks_numpy()
             else:
-                i_array = self.i
-                mz_array = self.mz
-            for pos, i in enumerate(i_array[:-1]):
-                if pos <= 1:
-                    continue
-                if 0 < i_array[pos - 1] < i > i_array[pos + 1] > 0:
-                    x1 = float(mz_array[pos - 1])
-                    y1 = float(i_array[pos - 1])
-                    x2 = float(mz_array[pos])
-                    y2 = float(i_array[pos])
-                    x3 = float(mz_array[pos + 1])
-                    y3 = float(i_array[pos + 1])
-                    if x2 - x1 > (x3 - x2) * 10 or (x2 - x1) * 10 < x3 - x2:
-                        continue
-                    if y3 == y1:
-                        y3 += 0.01 * y1
-
-                    try:
-                        double_log = math.log(y2 / y1) / math.log(y3 / y1)
-                        mue = (double_log * (x1 * x1 - x3 * x3) - x1 * x1 + x2 * x2) / (
-                            2 * (x2 - x1) - 2 * double_log * (x3 - x1)
-                        )
-                        c_squarred = (
-                            x2 * x2 - x1 * x1 - 2 * x2 * mue + 2 * x1 * mue
-                        ) / (2 * math.log(y1 / y2))
-                        A = y1 * math.exp((x1 - mue) * (x1 - mue) / (2 * c_squarred))
-                    except ZeroDivisionError:
-                        continue
-                    tmp.append((mue, A))
-            return tmp
+                return self._centroid_peaks_python()
         else:
             return self.peaks("raw")
 
-    def _reprofile_Peaks(self):
+    def _centroid_peaks_numpy(self) -> List[Tuple[float, float]]:
+        """
+        Numpy-optimized version of centroid peaks using vectorized operations.
+        
+        Returns:
+            centroided_peaks (list): list of centroided m/z, i tuples
+        """
+        if self._peak_dict["reprofiled"] is not None:
+            reprofiled_peaks = self.peaks("reprofiled")
+            i_array = np.array([i for mz, i in reprofiled_peaks], dtype=np.float64)
+            mz_array = np.array([mz for mz, i in reprofiled_peaks], dtype=np.float64)
+        else:
+            i_array = np.asarray(self.i, dtype=np.float64)
+            mz_array = np.asarray(self.mz, dtype=np.float64)
+        
+        # Vectorized peak detection
+        # Find local maxima where i[pos-1] < i[pos] > i[pos+1] and all > 0
+        if len(i_array) < 3:
+            return []
+        
+        # Create shifted arrays for comparison
+        i_prev = i_array[:-2]  # i[pos-1]
+        i_curr = i_array[1:-1]  # i[pos]
+        i_next = i_array[2:]  # i[pos+1]
+        
+        mz_prev = mz_array[:-2]  # mz[pos-1]
+        mz_curr = mz_array[1:-1]  # mz[pos]
+        mz_next = mz_array[2:]  # mz[pos+1]
+        
+        # Find peaks: 0 < i_prev < i_curr > i_next > 0
+        is_peak = (i_prev > 0) & (i_prev < i_curr) & (i_curr > i_next) & (i_next > 0)
+        
+        # Filter out peaks with irregular spacing (x2-x1 > (x3-x2)*10 or (x2-x1)*10 < x3-x2)
+        dx1 = mz_curr - mz_prev
+        dx2 = mz_next - mz_curr
+        valid_spacing = ~((dx1 > dx2 * 10) | (dx1 * 10 < dx2))
+        
+        is_peak = is_peak & valid_spacing
+        
+        # Extract valid peaks
+        x1 = mz_prev[is_peak]
+        y1 = i_prev[is_peak]
+        x2 = mz_curr[is_peak]
+        y2 = i_curr[is_peak]
+        x3 = mz_next[is_peak]
+        y3 = i_next[is_peak]
+        
+        # Handle y3 == y1 case
+        y3_adjusted = np.where(y3 == y1, y3 + 0.01 * y1, y3)
+        
+        # Vectorized Gaussian fit calculation
+        # Avoid log of zero or negative and division by zero
+        valid_log = (y2 > y1) & (y3_adjusted > y1) & (y1 > 0)
+        
+        if not np.any(valid_log):
+            return []
+        
+        x1 = x1[valid_log]
+        y1 = y1[valid_log]
+        x2 = x2[valid_log]
+        y2 = y2[valid_log]
+        x3 = x3[valid_log]
+        y3_adjusted = y3_adjusted[valid_log]
+        
+        # Calculate double_log = log(y2/y1) / log(y3/y1)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            double_log = np.log(y2 / y1) / np.log(y3_adjusted / y1)
+            
+            # Calculate mue (mean of Gaussian)
+            numerator = double_log * (x1 * x1 - x3 * x3) - x1 * x1 + x2 * x2
+            denominator = 2 * (x2 - x1) - 2 * double_log * (x3 - x1)
+            mue = numerator / denominator
+            
+            # Calculate c_squared (variance)
+            c_squared_num = x2 * x2 - x1 * x1 - 2 * x2 * mue + 2 * x1 * mue
+            c_squared_denom = 2 * np.log(y1 / y2)
+            c_squared = c_squared_num / c_squared_denom
+            
+            # Calculate A (amplitude)
+            A = y1 * np.exp((x1 - mue) * (x1 - mue) / (2 * c_squared))
+        
+        # Filter out invalid results (NaN or inf)
+        valid = np.isfinite(mue) & np.isfinite(A)
+        mue = mue[valid]
+        A = A[valid]
+        
+        # Convert to list of tuples
+        tmp = list(zip(mue.tolist(), A.tolist()))
+        return tmp
+
+    def _centroid_peaks_python(self) -> List[Tuple[float, float]]:
+        """
+        Pure Python implementation of centroid peaks (slower but no numpy dependency).
+        
+        Returns:
+            centroided_peaks (list): list of centroided m/z, i tuples
+        """
+        tmp = []
+        if self._peak_dict["reprofiled"] is not None:
+            i_array = [i for mz, i in self.peaks("reprofiled")]
+            mz_array = [mz for mz, i in self.peaks("reprofiled")]
+        else:
+            i_array = self.i
+            mz_array = self.mz
+        
+        for pos, i in enumerate(i_array[:-1]):
+            if pos <= 1:
+                continue
+            if 0 < i_array[pos - 1] < i > i_array[pos + 1] > 0:
+                x1 = float(mz_array[pos - 1])
+                y1 = float(i_array[pos - 1])
+                x2 = float(mz_array[pos])
+                y2 = float(i_array[pos])
+                x3 = float(mz_array[pos + 1])
+                y3 = float(i_array[pos + 1])
+                if x2 - x1 > (x3 - x2) * 10 or (x2 - x1) * 10 < x3 - x2:
+                    continue
+                if y3 == y1:
+                    y3 += 0.01 * y1
+
+                try:
+                    double_log = math.log(y2 / y1) / math.log(y3 / y1)
+                    mue = (double_log * (x1 * x1 - x3 * x3) - x1 * x1 + x2 * x2) / (
+                        2 * (x2 - x1) - 2 * double_log * (x3 - x1)
+                    )
+                    c_squarred = (
+                        x2 * x2 - x1 * x1 - 2 * x2 * mue + 2 * x1 * mue
+                    ) / (2 * math.log(y1 / y2))
+                    A = y1 * math.exp((x1 - mue) * (x1 - mue) / (2 * c_squarred))
+                except ZeroDivisionError:
+                    continue
+                tmp.append((mue, A))
+        return tmp
+
+    def _reprofile_Peaks(self) -> Dict[float, float]:
         """
         Performs reprofiling for property reprofiled_peaks.
 
         Returns:
             reprofiled_peaks (list): list of reprofiled m/z, i tuples
         """
-        tmp = ddict(int)
+        tmp: Dict[float, float] = ddict(int)
         for mz, i in self.peaks("centroided"):
             # Let the measured precision be 2 sigma of the signal width
             # When using normal distribution
             # FWHM = 2 sqt(2 * ln(2)) sigma = 2.3548 sigma
-            s = mz * self.measured_precision * 2  # in before 2
-            s2 = s * s
-            floor = mz - 5.0 * s  # Gauss curve +- 3 sigma
-            ceil = mz + 5.0 * s
-            ip = self.internal_precision / 4
+            s: float = mz * self.measured_precision * 2  # in before 2
+            s2: float = s * s
+            floor: float = mz - 5.0 * s  # Gauss curve +- 3 sigma
+            ceil: float = mz + 5.0 * s
+            ip: float = self.internal_precision / 4
             # more spacing, i.e. less points describing the gauss curve
             # -> faster adding
             for _ in range(int(round(floor * ip)), int(round(ceil * ip)) + 1):
                 if _ % int(5) == 0:
-                    a = float(_) / float(ip)
-                    y = i * math.exp(-1 * ((mz - a) * (mz - a)) / (2 * s2))
+                    a: float = float(_) / float(ip)
+                    y: float = i * math.exp(-1 * ((mz - a) * (mz - a)) / (2 * s2))
                     tmp[a] += y
         self.reprofiled = True
         self.set_peaks(None, "centroided")
         return tmp
 
-    def _mz_2_mass(self, mz, charge):
+    def _mz_2_mass(self, mz: float, charge: int) -> float:
         """
         Calculate the uncharged mass for a given mz value
 
@@ -1333,19 +1422,19 @@ class Spectrum(MsData):
         """
         return (mz - PROTON) * charge
 
-    def _set_params_from_reference_group(self, ref_element):
-        ref = self.element.find("{ns}referenceableParamGroupRef".format(ns=self.ns))
+    def _set_params_from_reference_group(self, ref_element: ElementTree.Element) -> None:
+        ref: Optional[ElementTree.Element] = self.element.find("{ns}referenceableParamGroupRef".format(ns=self.ns))
         if ref is not None:
-            ref = ref.get("ref")
-        ele = ref_element.find(".//*[@id='{ref}']".format(ref=ref, ns=self.ns))
-        if ele is not None and ref == ele.get("id"):
-            for param in ele.iter():
-                self.element.append(ele)
-                acc = param.get("accession")
+            ref_id: Optional[str] = ref.get("ref")
+            ele: Optional[ElementTree.Element] = ref_element.find(".//*[@id='{ref}']".format(ref=ref_id, ns=self.ns))
+            if ele is not None and ref_id == ele.get("id"):
+                for param in ele.iter():
+                    self.element.append(ele)
+                    acc: Optional[str] = param.get("accession")
 
     # Public functions
 
-    def reduce(self, peak_type="raw", mz_range=(None, None)):
+    def reduce(self, peak_type: str = "raw", mz_range: Tuple[Optional[float], Optional[float]] = (None, None)) -> Union['NDArray', List]:
         """
         Remove all m/z values outside the given range.
 
@@ -1363,8 +1452,8 @@ class Spectrum(MsData):
         return peaks
 
     def remove_noise(
-        self, mode="median", noise_level=None, signal_to_noise_threshold=1.0
-    ):
+        self, mode: str = "median", noise_level: Optional[float] = None, signal_to_noise_threshold: float = 1.0
+    ) -> 'Spectrum':
         """
         Function to remove noise from peaks, centroided peaks and reprofiled
         peaks.
@@ -1397,7 +1486,7 @@ class Spectrum(MsData):
         self._peak_dict["reprofiled"] = None
         return self
 
-    def estimated_noise_level(self, mode="median"):
+    def estimated_noise_level(self, mode: str = "median") -> float:
         """
         Calculates noise threshold for function remove_noise.
 
@@ -1439,7 +1528,7 @@ class Spectrum(MsData):
             return_value = self.noise_level_estimate[mode]
         return return_value
 
-    def highest_peaks(self, n):
+    def highest_peaks(self, n: int) -> Union['NDArray', List[Tuple[float, float]]]:
         """
         Function to retrieve the n-highest centroided peaks of the spectrum.
 
@@ -1471,7 +1560,7 @@ class Spectrum(MsData):
             ]
         return self._centroided_peaks_sorted_by_i[-n:]
 
-    def ppm2abs(self, value, ppm_value, direction=1, factor=1):
+    def ppm2abs(self, value: float, ppm_value: float, direction: int = 1, factor: float = 1) -> float:
         """
         Returns the value plus (or minus, dependent on direction) the
         error (measured precision ) for this value.
@@ -1493,7 +1582,7 @@ class Spectrum(MsData):
         result = value + (value * (ppm_value * factor)) * direction
         return result
 
-    def extreme_values(self, key):
+    def extreme_values(self, key: str) -> Tuple[float, float]:
         """
         Find extreme values, minimal and maximum m/z and intensity
 
@@ -1533,7 +1622,7 @@ class Spectrum(MsData):
             self._extreme_values[key] = ()
         return self._extreme_values[key]
 
-    def has_peak(self, mz2find):
+    def has_peak(self, mz2find: float) -> List[Tuple[float, float]]:
         """
         Checks if a Spectrum has a certain peak.
         Requires a m/z value as input and returns a list of peaks if the m/z
@@ -1570,7 +1659,7 @@ class Spectrum(MsData):
         value = self.transform_mz(mz2find)
         return self.transformed_mz_with_error[value]
 
-    def has_overlapping_peak(self, mz):
+    def has_overlapping_peak(self, mz: float) -> bool:
         """
         Checks if a spectrum has more than one peak for a given m/z value
         and within the measured precision
@@ -1589,7 +1678,7 @@ class Spectrum(MsData):
                 return True
         return False
 
-    def similarity_to(self, spec2, round_precision=0):
+    def similarity_to(self, spec2: 'Spectrum', round_precision: int = 0) -> float:
         """
         Compares two spectra and returns cosine
 
@@ -1640,7 +1729,7 @@ class Spectrum(MsData):
             cosine = 0.0
         return cosine
 
-    def transform_mz(self, value):
+    def transform_mz(self, value: float) -> int:
         """
         pymzml uses an internal precision for different tasks. This precision
         depends on the measured precision and is calculated when
@@ -1677,8 +1766,8 @@ class Spectrum(MsData):
         """
         return int(round(value * self.internal_precision))
 
-    def deprecation_warning(self, function_name):
-        deprecation_lookup = {
+    def deprecation_warning(self, function_name: str) -> None:
+        deprecation_lookup: Dict[str, str] = {
             "similarityTo": "similarity_to",
             "hasPeak": "has_peak",
             "extremeValues": "extreme_values",
@@ -1700,40 +1789,40 @@ class Spectrum(MsData):
             DeprecationWarning,
         )
 
-    def similarityTo(self, spec2, round_precision=0):
+    def similarityTo(self, spec2: 'Spectrum', round_precision: int = 0) -> float:
         self.deprecation_warning(sys._getframe().f_code.co_name)
         return self.similarity_to(spec2, round_precision=round_precision)
 
-    def hasPeak(self, mz):
+    def hasPeak(self, mz: float) -> List[Tuple[float, float]]:
         self.deprecation_warning(sys._getframe().f_code.co_name)
         return self.has_peak(mz)
 
-    def extremeValues(self, key):
+    def extremeValues(self, key: str) -> Tuple[float, float]:
         self.deprecation_warning(sys._getframe().f_code.co_name)
         return self.extreme_values(key)
 
-    def transformMZ(self, value):
+    def transformMZ(self, value: float) -> int:
         self.deprecation_warning(sys._getframe().f_code.co_name)
         return self.transform_mz(value)
 
-    def hasOverlappingPeak(self, mz):
+    def hasOverlappingPeak(self, mz: float) -> bool:
         self.deprecation_warning(sys._getframe().f_code.co_name)
         return self.has_overlapping_peak(mz)
 
-    def highestPeaks(self, n):
+    def highestPeaks(self, n: int) -> Union['NDArray', List[Tuple[float, float]]]:
         self.deprecation_warning(sys._getframe().f_code.co_name)
         return self.highest_peaks(n)
 
-    def estimatedNoiseLevel(self, mode="median"):
+    def estimatedNoiseLevel(self, mode: str = "median") -> float:
         self.deprecation_warning(sys._getframe().f_code.co_name)
         return self.estimated_noise_level(mode=mode)
 
-    def removeNoise(self, mode="median", noiseLevel=None):
+    def removeNoise(self, mode: str = "median", noiseLevel: Optional[float] = None) -> 'Spectrum':
         self.deprecation_warning(sys._getframe().f_code.co_name)
         return self.remove_noise(mode=mode, noise_level=noiseLevel)
 
     @property
-    def centroidedPeaks(self):
+    def centroidedPeaks(self) -> Union['NDArray', List[Tuple[float, float]]]:
         # self.deprecation_warning( sys._getframe().f_code.co_name )
         return self.peaks("centroided")
 
@@ -1743,7 +1832,7 @@ class Chromatogram(MsData):
     Class for Chromatogram access and handling.
     """
 
-    def __init__(self, element, measured_precision=5e-6, *, obo_version=None):
+    def __init__(self, element: ElementTree.Element, measured_precision: float = 5e-6, *, obo_version: Optional[str] = None) -> None:
         """
         Arguments:
             element (xml.etree.ElementTree.Element): spectrum as xml Element
@@ -1752,85 +1841,48 @@ class Chromatogram(MsData):
             measured_precision (float): in ppm, i.e. 5e-6 equals to 5 ppm.
             param (dict): parameter mapping for this spectrum
         """
-        self._measured_precision = measured_precision
-        self.element = element
-        self.noise_level_estimate = {}
-        # Property variables
-        self._time = None
+        # Call parent class __init__
+        super().__init__(element, measured_precision, obo_version=obo_version)
+        
+        # Chromatogram-specific attributes
         self._ms_level = None
-        self._i = None
         self._t_mass_set = None
         self._peaks = None
         self._t_mz_set = None
         self._centroided_peaks = None
         self._reprofiled_peaks = None
         self._deconvoluted_peaks = None
-        self._profile = None
         self._extreme_values = None
         self._centroided_peaks_sorted_by_i = None
         self._transformed_mz_with_error = None
         self._transformed_mass_with_error = None
         self._precursors = None
         self._ID = None
-        self.obo_translator = OboTranslator.from_cache(obo_version)
 
-        if self.element:
-            # self._read_accessions()
-            self.ns = (
-                re.match(r"\{.*\}", element.tag).group(0)
-                if re.match(r"\{.*\}", element.tag)
-                else ""
-            )
-            # self._ns_paths            = {
-            #     'mz'      : "{ns}binaryDataArrayList/" \
-            #                 "{ns}binaryDataArray/" \
-            #                 "{ns}cvParam[@accession='{Acc}']/..".format(
-            #                     ns=self.ns,
-            #                     Acc=self.accessions['time array']
-            #             ),
-            #     'i'       : "{ns}binaryDataArrayList/" \
-            #                 "{ns}binaryDataArray/" \
-            #                 "{ns}cvParam[@accession='{Acc}']/..".format(
-            #                         ns=self.ns,
-            #                         Acc=self.accessions['intensity array']
-            #                 ),
-            #     'time'    : "{ns}binaryDataArrayList/" \
-            #                 "{ns}binaryDataArray/" \
-            #                 "{ns}cvParam[@accession='{Acc}']/..".format(
-            #                         ns=self.ns,
-            #                         Acc=self.accessions['time array']
-            #                 ),
-            #     'float_type' : "./{ns}cvParam[@accession='{Acc}']"
-            # }
-
-        self._decode = self._decode_to_numpy
-        # assign function to create numpy array to list???
-        self._array = np.array
-
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<__main__.Chromatogram object with native ID {0} at {1}>".format(
             self.ID, hex(id(self))
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "<__main__.Chromatogram object with native ID {0} at {1}>".format(
             self.ID, hex(id(self))
         )
 
     @property
-    def ID(self):
+    def ID(self) -> Optional[str]:
         if self._ID is None:
             self._ID = self.element.get("id")
         return self._ID
 
     @property
-    def mz(self):
+    def mz(self) -> Union['NDArray', Tuple, List]:
         """"""
         print("Chromatogram has no property mz.\nReturn retention time instead")
         return self.time
 
     @property
-    def time(self):
+    def time(self) -> Union['NDArray', Tuple, List]:
         """
         Returns the list of time values. If the time values are encoded, the
         function _decode() is used to decode the encoded data.\n
@@ -1848,14 +1900,14 @@ class Chromatogram(MsData):
         return self._time
 
     @property
-    def i(self):
+    def i(self) -> Union['NDArray', Tuple, List]:
         if self._i is None:
-            params = self._get_encoding_parameters("intensity array")
+            params: Tuple[bytes, str, Optional[str], List[str]] = self._get_encoding_parameters("intensity array")
             self._i = self._decode(*params)
         return self._i
 
     @property
-    def profile(self):
+    def profile(self) -> Union['NDArray', List[List[float]]]:
         """
         Returns the list of peaks of the chromatogram as tuples (time, intensity).
 
@@ -1897,13 +1949,13 @@ class Chromatogram(MsData):
         return self._array(self._profile)
 
     @profile.setter
-    def profile(self, tuple_list):
+    def profile(self, tuple_list: List[Tuple[float, float]]) -> 'Chromatogram':
         if len(tuple_list) == 0:
-            return
+            return self
         # self._mz, self._i = map(list, zip(*tuple_list))
         # same here .. zip is soooooo slow :)
-        self._time = []
-        self._i = []
+        self._time: List[float] = []
+        self._i: List[float] = []
         for time, i in tuple_list:
             self._time.append(time)
             self._i.append(i)
@@ -1912,7 +1964,7 @@ class Chromatogram(MsData):
         self._centroidedPeaks = None
         return self
 
-    def peaks(self):
+    def peaks(self) -> Union['NDArray', List[List[float]]]:
         """
         Return the list of peaks of the spectrum as tuples (time, intensity).
 

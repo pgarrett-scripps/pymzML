@@ -29,9 +29,11 @@ Reader class for indexed gzipped files
 import struct
 import zlib
 from collections import OrderedDict
+from typing import Union, Optional, BinaryIO
+from types import TracebackType
 
 
-class GSGR(object):
+class GSGR:
     """
     Generalized Gzip reader class which enables random access in files
     written with the :class:`~pymzml.utils.GSGW.GSGW` class.
@@ -40,27 +42,34 @@ class GSGR(object):
         file (str): path to file to read
     """
 
-    def __init__(self, file=None):
-
-        self.file_in = open(file, "rb")
-        self.filename = file
-        self.magic_bytes = b"\x1f\x8b"
-        self.indexed = True
+    def __init__(self, file: str) -> None:
+        self.file_in: BinaryIO = open(file, "rb")
+        self.filename: str = file
+        self.magic_bytes: bytes = b"\x1f\x8b"
+        self.indexed: bool = True
+        self.random_access: bool = False
+        self.ascii_file: bool = False
+        self.fname: Optional[bytes] = None
+        self.index: OrderedDict[Union[int, str], int] = OrderedDict()
+        self.cm: int = 0
+        self.flg: int = 0
+        self.mtime: int = 0
+        self.xfl: int = 0
+        self.os: int = 0
+        self.idx_len: int = 0
+        self.offset_len: int = 0
 
         if not self._check_magic_bytes():
             raise Exception("not a gzip file (wrong magic bytes)")
 
-        self.random_access = False  # initial state, until index is read
-
         self._read_basic_header()
-        if self.flg & 0 != 0:  # FTEXT flag
+        if self.flg & 1 != 0:  # FTEXT flag
             self.ascii_file = True
         if self.flg & 2 != 0:  # FHCRC flag
-            crc16 = self.file_in.read(2)
+            _ = self.file_in.read(2)
         if self.flg & 4 != 0:  # FEXTRA flag
-            # TODO: maybe never tested
             xlen = struct.unpack("<H", self.file_in.read(2))[0]
-            self.file_in.seek(xlen)
+            self.file_in.seek(xlen, 1)
         if self.flg & 8 != 0:  # FNAME flag
             self.fname = self._read_until_zero()
         if self.flg & 16 == 0:  # FCOMMENT flag NOT SET
@@ -68,13 +77,13 @@ class GSGR(object):
         else:
             self._read_index()
 
-    def __del__(self):
+    def __del__(self) -> None:
         try:
             self.close()
-        except:
-            raise Exception(" cant close file")
+        except Exception:
+            pass
 
-    def seek(self, offset):
+    def seek(self, offset: int) -> None:
         """
         Seek to byte offset in input file.
 
@@ -85,9 +94,8 @@ class GSGR(object):
             None
         """
         self.file_in.seek(offset)
-        return
 
-    def read_block(self, index):
+    def read_block(self, index: Union[int, str]) -> bytes:
         """
         Read and return the data block with the unique index `index`
 
@@ -100,7 +108,7 @@ class GSGR(object):
         start = self.index[index]
         try:
             end = self.index[int(index) + 1]
-        except:
+        except (KeyError, ValueError, TypeError):
             end = self.file_in.seek(0, 2)
         self.file_in.seek(start)
         readSize = end - start
@@ -108,20 +116,19 @@ class GSGR(object):
         data = zlib.decompress(comp_data, -zlib.MAX_WBITS)
         return data
 
-    def _check_magic_bytes(self):
+    def _check_magic_bytes(self) -> bool:
         """
         Check if file is a gzip file.
         """
-        # self.file_in.seek(0) # make sure file pointer is at start
         mb = self.file_in.read(2)
         return mb == self.magic_bytes
 
-    def _read_basic_header(self):
+    def _read_basic_header(self) -> None:
         """
         Read and save compression method, bitflags, changetime,
         compression speed and os.
         """
-        self.file_in.seek(2)  # make sure filepoiner is at correct position
+        self.file_in.seek(2)
         vals = struct.unpack("<BBLBB", self.file_in.read(8))
         self.cm = vals[0]
         self.flg = vals[1]
@@ -129,7 +136,7 @@ class GSGR(object):
         self.xfl = vals[3]
         self.os = vals[4]
 
-    def _read_until_zero(self):
+    def _read_until_zero(self) -> bytes:
         """
         Read input until \x00 is reached
         """
@@ -140,16 +147,17 @@ class GSGR(object):
             c = self.file_in.read(1)
         return buf
 
-    def _read_index(self):
+    def _read_index(self) -> None:
         """
         Read and save offset dict from indexed gzip file
         """
-        self.index = OrderedDict()
-        self.file_in.seek(10)  # make sure file pointer is at right position
+        self.file_in.seek(10)
         mb = self.file_in.read(3)
         if mb != b"FU\x01":  # All hail MK!
             print("No index in comment field found. No random access possible")
             self.indexed = False
+            return
+        
         lengths = struct.unpack("<BB", self.file_in.read(2))
         self.idx_len = lengths[0]
         self.offset_len = lengths[1]
@@ -159,16 +167,16 @@ class GSGR(object):
             OffsetBlock = self.file_in.read(self.offset_len)
             try:
                 try:
-                    Identifier = int(ID_block.decode("latin-1").strip("¬"))
-                except:
+                    Identifier: Union[int, str] = int(ID_block.decode("latin-1").strip("¬"))
+                except (ValueError, UnicodeDecodeError):
                     Identifier = ID_block.decode("latin-1").strip("¬")
                 Offset = int(OffsetBlock.decode("latin-1").strip("¬"))
                 self.index[Identifier] = Offset
-            except:
+            except (ValueError, UnicodeDecodeError):
                 break
         self.file_in.seek(0)
 
-    def read(self, size=-1):
+    def read(self, size: int = -1) -> bytes:
         """
         Read the content of the in File in binary mode
 
@@ -180,19 +188,24 @@ class GSGR(object):
         """
         return self.file_in.read(size)
 
-    def __enter__(self):
+    def __enter__(self) -> "GSGR":
         """
         Enable the with syntax for this class (entry point)
         """
-        return self.file_in
+        return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_value: Optional[BaseException],
+        traceback: Optional[TracebackType],
+    ) -> None:
         """
         destructor when using this class with 'with .. as '
         """
         self.file_in.close()
 
-    def close(self):
+    def close(self) -> None:
         """
         Close the internal Filehandler
         """

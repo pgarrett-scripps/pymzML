@@ -33,10 +33,19 @@ There each chromatogram is accessible as a chromatogram object.
 #     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #     SOFTWARE.
 
-import re
-import numpy as np
+from typing import Optional, List, Tuple, Dict, Any, Union
+from xml.etree.ElementTree import Element
+
+try:
+    import numpy as np
+    from numpy.typing import NDArray
+    has_numpy = True
+except (ImportError, ModuleNotFoundError):
+    has_numpy = False
+    np = None
+    NDArray = None
+
 from .msdata import MsData
-from .obo import OboTranslator
 
 
 class Chromatogram(MsData):
@@ -44,7 +53,13 @@ class Chromatogram(MsData):
     Class for Chromatogram access and handling.
     """
 
-    def __init__(self, element, measured_precision=5e-6, *, obo_version=None):
+    def __init__(
+        self,
+        element: Optional[Element],
+        measured_precision: float = 5e-6,
+        *,
+        obo_version: Optional[str] = None
+    ) -> None:
         """
         Arguments:
             element (xml.etree.ElementTree.Element): chromatogram as xml Element
@@ -53,44 +68,29 @@ class Chromatogram(MsData):
             measured_precision (float): in ppm, i.e. 5e-6 equals to 5 ppm.
             obo_version (str, optional): obo version number.
         """
-        self._measured_precision = measured_precision
-        self.element = element
-        self.noise_level_estimate = {}
-        # Property variables
-        self._time = None
-        self._ms_level = None
-        self._i = None
-        self._t_mass_set = None
-        self._peaks = None
-        self._t_mz_set = None
-        self._centroided_peaks = None
-        self._reprofiled_peaks = None
-        self._deconvoluted_peaks = None
-        self._profile = None
-        self._extreme_values = None
-        self._centroided_peaks_sorted_by_i = None
-        self._transformed_mz_with_error = None
-        self._transformed_mass_with_error = None
-        self._precursors = None
-        self._ID = None
-        self._chromatogram_type = None
-        self._precursor_mz = None
-        self._product_mz = None
-        self._polarity = None
-        self.obo_translator = OboTranslator.from_cache(obo_version)
+        # Call parent class __init__
+        super().__init__(element, measured_precision, obo_version=obo_version)
+        
+        # Chromatogram-specific attributes
+        self._ms_level: Optional[int] = None
+        self._t_mass_set: Optional[Any] = None
+        self._peaks: Optional[Union[List[List[float]], NDArray]] = None
+        self._t_mz_set: Optional[Any] = None
+        self._centroided_peaks: Optional[Any] = None
+        self._reprofiled_peaks: Optional[Any] = None
+        self._deconvoluted_peaks: Optional[Any] = None
+        self._extreme_values: Optional[Any] = None
+        self._centroided_peaks_sorted_by_i: Optional[Any] = None
+        self._transformed_mz_with_error: Optional[Any] = None
+        self._transformed_mass_with_error: Optional[Any] = None
+        self._precursors: Optional[Any] = None
+        self._ID: Optional[str] = None
+        self._chromatogram_type: Optional[str] = None
+        self._precursor_mz: Optional[float] = None
+        self._product_mz: Optional[float] = None
+        self._polarity: Optional[str] = None
 
-        if self.element:
-            self.ns = (
-                re.match(r"\{.*\}", element.tag).group(0)
-                if re.match(r"\{.*\}", element.tag)
-                else ""
-            )
-
-        self._decode = self._decode_to_numpy
-        # assign function to create numpy array to list???
-        self._array = np.array
-
-    def __repr__(self):
+    def __repr__(self) -> str:
         """
         Returns representative string for a chromatogram object class
         """
@@ -98,7 +98,7 @@ class Chromatogram(MsData):
             self.ID, hex(id(self))
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         """
         Returns representative string for a chromatogram object class
         """
@@ -107,7 +107,7 @@ class Chromatogram(MsData):
         )
 
     @property
-    def ID(self):
+    def ID(self) -> Optional[str]:
         """
         Access the native id of the chromatogram.
 
@@ -115,12 +115,12 @@ class Chromatogram(MsData):
             ID (str): native ID of the chromatogram
         """
         if self._ID is None:
-            if self.element:
+            if self.element is not None:
                 self._ID = self.element.get("id")
         return self._ID
 
     @property
-    def mz(self):
+    def mz(self) -> Optional[Union[List[float], NDArray]]:
         """
         Chromatogram has no property mz. This property is included for
         compatibility with the Spectrum class.
@@ -132,7 +132,7 @@ class Chromatogram(MsData):
         return self.time
 
     @property
-    def time(self):
+    def time(self) -> Optional[Union[List[float], NDArray]]:
         """
         Returns the list of time values. If the time values are encoded, the
         function _decode() is used to decode the encoded data.\n
@@ -150,7 +150,7 @@ class Chromatogram(MsData):
         return self._time
 
     @property
-    def i(self):
+    def i(self) -> Optional[Union[List[float], NDArray]]:
         """
         Returns the list of intensity values from the analyzed chromatogram.
 
@@ -163,7 +163,7 @@ class Chromatogram(MsData):
         return self._i
 
     @property
-    def profile(self):
+    def profile(self) -> Union[List[List[float]], NDArray]:
         """
         Returns the list of peaks of the chromatogram as tuples (time, intensity).
 
@@ -205,7 +205,7 @@ class Chromatogram(MsData):
         return self._array(self._profile)
 
     @profile.setter
-    def profile(self, tuple_list):
+    def profile(self, tuple_list: List[Tuple[float, float]]) -> "Chromatogram":
         """
         Set the chromatogram profile.
 
@@ -213,9 +213,9 @@ class Chromatogram(MsData):
             tuple_list (list): list of tuples (time, intensity)
         """
         if len(tuple_list) == 0:
-            return
-        self._time = []
-        self._i = []
+            return self
+        self._time: List[float] = []
+        self._i: List[float] = []
         for time, i in tuple_list:
             self._time.append(time)
             self._i.append(i)
@@ -224,7 +224,7 @@ class Chromatogram(MsData):
         self._centroidedPeaks = None
         return self
 
-    def peaks(self):
+    def peaks(self) -> Union[List[List[float]], NDArray]:
         """
         Return the list of peaks of the chromatogram as tuples (time, intensity).
 
@@ -254,7 +254,7 @@ class Chromatogram(MsData):
         return self.profile
 
     @property
-    def chromatogram_type(self):
+    def chromatogram_type(self) -> Optional[str]:
         """
         Returns the chromatogram type.
 
@@ -262,6 +262,8 @@ class Chromatogram(MsData):
             chromatogram_type (str): chromatogram type
         """
         if self._chromatogram_type is None:
+            if self.element is None:
+                raise ValueError("Chromatogram element is None.")
             for element in self.element.iter():
                 if element.tag.endswith("}cvParam"):
                     accession = element.get("accession")
@@ -291,7 +293,7 @@ class Chromatogram(MsData):
         return self._chromatogram_type
 
     @property
-    def polarity(self):
+    def polarity(self) -> Optional[str]:
         """
         Returns the polarity of the chromatogram.
 
@@ -299,6 +301,8 @@ class Chromatogram(MsData):
             polarity (str): polarity (positive scan or negative scan)
         """
         if self._polarity is None:
+            if self.element is None:
+                raise ValueError("Chromatogram element is None.")
             for element in self.element.iter():
                 if element.tag.endswith("}cvParam"):
                     accession = element.get("accession")
@@ -312,7 +316,7 @@ class Chromatogram(MsData):
         return self._polarity
 
     @property
-    def precursor_mz(self):
+    def precursor_mz(self) -> Optional[float]:
         """
         Returns the precursor m/z value for SRM/MRM chromatograms.
 
@@ -320,6 +324,8 @@ class Chromatogram(MsData):
             precursor_mz (float): precursor m/z value
         """
         if self._precursor_mz is None:
+            if self.element is None:
+                raise ValueError("Chromatogram element is None.")
             precursor = self.element.find(f".//{self.ns}precursor")
             if precursor is not None:
                 isolation_window = precursor.find(f".//{self.ns}isolationWindow")
@@ -334,7 +340,7 @@ class Chromatogram(MsData):
         return self._precursor_mz
 
     @property
-    def product_mz(self):
+    def product_mz(self) -> Optional[float]:
         """
         Returns the product m/z value for SRM/MRM chromatograms.
 
@@ -342,6 +348,8 @@ class Chromatogram(MsData):
             product_mz (float): product m/z value
         """
         if self._product_mz is None:
+            if self.element is None:
+                raise ValueError("Chromatogram element is None.")
             product = self.element.find(f".//{self.ns}product")
             if product is not None:
                 isolation_window = product.find(f".//{self.ns}isolationWindow")
@@ -355,14 +363,14 @@ class Chromatogram(MsData):
                             break
         return self._product_mz
 
-    def get_chromatogram_properties(self):
+    def get_chromatogram_properties(self) -> Dict[str, Any]:
         """
         Returns a dictionary with the main properties of the chromatogram.
 
         Returns:
             properties (dict): dictionary with chromatogram properties
         """
-        properties = {
+        properties: Dict[str, Any] = {
             "id": self.ID,
             "chromatogram_type": self.chromatogram_type,
             "polarity": self.polarity,

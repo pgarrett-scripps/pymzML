@@ -1,11 +1,12 @@
 import sqlite3
+from typing import Union
 import xml.etree.ElementTree as et
 from pymzml import spec
 from pymzml import chromatogram
 from pymzml.run import Reader
 
 
-def create_database_from_file(db_name, file_path):
+def create_database_from_file(db_name: str, file_path: str):
     conn = sqlite3.connect(db_name + ".db")
     Run = Reader("./tests/data/example.mzML")
     with conn:
@@ -27,12 +28,12 @@ class SQLiteDatabase(object):
     a custom __getitem__ function to retrieve the spectra
     """
 
-    def __init__(self, path):
+    def __init__(self, path: str):
         """ """
         connection = sqlite3.connect(path)
         self.cursor = connection.cursor()
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: Union[str, int]) -> Union[spec.Spectrum, chromatogram.Chromatogram]:
         """
         Execute a SQL request, process the data and return a spectrum object.
 
@@ -40,22 +41,22 @@ class SQLiteDatabase(object):
             key (str or int): unique identifier for the given spectrum in the
             database
         """
-        self.cursor.execute("SELECT * FROM spectra WHERE id=?", key)
-        ID, element = self.cursor.fetchone()
+        self.cursor.execute("SELECT * FROM spectra WHERE id=?", (key,))
+        _, element = self.cursor.fetchone()
 
         element = et.XML(element)
         if "spectrum" in element.tag:
-            spectrum = spec.Spectrum(element)
+            return spec.Spectrum(element)
         elif "chromatogram" in element.tag:
-            spectrum = chromatogram.Chromatogram(element)
-        return spectrum
+            return chromatogram.Chromatogram(element)
+        raise KeyError("No spectrum or chromatogram with id {0} found".format(key))
 
     def get_spectrum_count(self):
         self.cursor.execute("SELECT COUNT(*) from spectra")
         num = self.cursor.fetchone()[0]
         return num
 
-    def read(self, size=-1):
+    def read(self, size: int = -1) -> str:
         # implement read so it starts reading in first ID,
         # if end reached switches to next id and so on ...
 

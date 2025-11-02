@@ -1,7 +1,6 @@
 """Collection of regular expressions to catch spectrum XML-tags."""
 
 import re
-import regex
 
 SPECTRUM_INDEX_PATTERN = re.compile(
     b'(?P<type>(scan=|nativeID="))(?P<nativeID>[0-9]*)">"'
@@ -23,7 +22,7 @@ SIM_INDEX_PATTERN = re.compile(
 """
 Regex pattern for SIM index
 """
-SPECTRUM_PATTERN3 = regex.compile(r"((\w+)=(\w+\s*))+")
+SPECTRUM_PATTERN3 = re.compile(r"(\w+)=(\w+)")
 SPECTRUM_ID_PATTERN = re.compile(r'="{0,1}([0-9]*)"{0,1}>{0,1}$')
 SPECTRUM_ID_PATTERN2 = re.compile(r"(scan|scanId)=(\d+)")
 """

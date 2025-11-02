@@ -293,7 +293,7 @@ class Factory(object):
 
         for i, plot in enumerate(self.plots):
             for j, trace in enumerate(plot):
-                my_figure.append_trace(trace, int(math.floor((i / 2) + 1)), (i % 2) + 1)
+                my_figure.add_trace(trace, row=int(math.floor((i / 2) + 1)), col=(i % 2) + 1)
 
         for i in range(plot_number):
             if xLimits:
