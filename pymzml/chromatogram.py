@@ -16,7 +16,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .msdata import MsData
-from .constants import chromatogram_type_accessions
+from .constants import chromatogram_type_accessions, XMLAttribute, ChromatogramMSAccession
 
 
 class Chromatogram(MsData):
@@ -235,9 +235,9 @@ class Chromatogram(MsData):
         if self._chromatogram_type is None and self.element is not None:
             for element in self.element.iter():
                 if element.tag.endswith("}cvParam"):
-                    accession = element.get("accession")
+                    accession = element.get(XMLAttribute.ACCESSION)
                     if accession in chromatogram_type_accessions:
-                        self._chromatogram_type = element.get("name")
+                        self._chromatogram_type = element.get(XMLAttribute.NAME)
                         break
         return self._chromatogram_type
 
@@ -252,9 +252,9 @@ class Chromatogram(MsData):
         if self._polarity is None and self.element is not None:
             for element in self.element.iter():
                 if element.tag.endswith("}cvParam"):
-                    accession = element.get("accession")
-                    if accession in ("MS:1000129", "MS:1000130"):
-                        self._polarity = element.get("name")
+                    accession = element.get(XMLAttribute.ACCESSION)
+                    if accession in (ChromatogramMSAccession.POSITIVE_SCAN, ChromatogramMSAccession.NEGATIVE_SCAN):
+                        self._polarity = element.get(XMLAttribute.NAME)
                         break
         return self._polarity
 
@@ -274,7 +274,7 @@ class Chromatogram(MsData):
                     for element in isolation_window.iter():
                         if (
                             element.tag.endswith("}cvParam")
-                            and element.get("accession") == "MS:1000827"
+                            and element.get(XMLAttribute.ACCESSION) == ChromatogramMSAccession.ISOLATION_WINDOW_TARGET_MZ
                         ):
                             value = element.get("value")
                             if value is not None:
@@ -298,7 +298,7 @@ class Chromatogram(MsData):
                     for element in isolation_window.iter():
                         if (
                             element.tag.endswith("}cvParam")
-                            and element.get("accession") == "MS:1000827"
+                            and element.get(XMLAttribute.ACCESSION) == ChromatogramMSAccession.ISOLATION_WINDOW_TARGET_MZ
                         ):
                             value = element.get("value")
                             if value is not None:

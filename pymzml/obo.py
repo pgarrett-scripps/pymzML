@@ -63,6 +63,8 @@ import gzip
 import urllib.request
 from typing import Any, ClassVar, Pattern
 
+from .constants import OBOKey, OBOSection, FileExtension
+
 
 class OboTranslator(object):
     """
@@ -107,7 +109,7 @@ class OboTranslator(object):
             if key in lookup:
                 if self.MS_tag_regex.match(key):
                     try:
-                        return lookup[key]["name"]
+                        return lookup[key][OBOKey.NAME]
                     except:
                         pass
                 return lookup[key]
@@ -168,15 +170,15 @@ class OboTranslator(object):
         obo_file = os.path.join(
             obo_root,
             "obo",
-            "psi-ms{0}.obo".format("-" + self.version if self.version else ""),
+            f"psi-ms{'-' + self.version if self.version else ''}{FileExtension.OBO}",
         )
         if os.path.exists(obo_file):
             pass
-        elif os.path.exists(obo_file + ".gz"):
-            obo_file = obo_file + ".gz"
+        elif os.path.exists(obo_file + FileExtension.GZ):
+            obo_file = obo_file + FileExtension.GZ
         else:
             self.download_obo(self.version, obo_file)
-            obo_file += ".gz"
+            obo_file += FileExtension.GZ
 
         with open(obo_file, "rb") as fin:
             # never rely on file extensions!
@@ -194,7 +196,7 @@ class OboTranslator(object):
             collections: dict[str, str] = {}
             collect = False
             for line in obo:
-                if line.strip() in ("[Term]", ""):
+                if line.strip() in (OBOSection.TERM, ""):
                     collect = True
                     if not collections:
                         continue
@@ -218,12 +220,12 @@ class OboTranslator(object):
             self.parseOBO()
 
         self.all_dicts.append(collection_dict)
-        if "id" in collection_dict.keys():
-            self.id[collection_dict["id"]] = self.all_dicts[-1]
-        if "name" in collection_dict.keys():
-            self.name[collection_dict["name"]] = self.all_dicts[-1]
-        if "def" in collection_dict.keys():
-            self.definition[collection_dict["def"]] = self.all_dicts[-1]
+        if OBOKey.ID in collection_dict.keys():
+            self.id[collection_dict[OBOKey.ID]] = self.all_dicts[-1]
+        if OBOKey.NAME in collection_dict.keys():
+            self.name[collection_dict[OBOKey.NAME]] = self.all_dicts[-1]
+        if OBOKey.DEFINITION in collection_dict.keys():
+            self.definition[collection_dict[OBOKey.DEFINITION]] = self.all_dicts[-1]
 
         return
 
@@ -241,7 +243,7 @@ class OboTranslator(object):
         if not self.__obo_parsed:
             self.parseOBO()
 
-        if self.id[idTag]["name"] == name:
+        if self.id[idTag][OBOKey.NAME] == name:
             return True
         else:
             return False

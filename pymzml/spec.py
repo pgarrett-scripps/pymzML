@@ -20,7 +20,6 @@ with profile data (time, intensity) in an total ion chromatogram.
 from typing import Any
 
 import math
-import sys
 import xml.etree.ElementTree as ElementTree
 from collections import defaultdict as ddict
 from functools import lru_cache
@@ -826,7 +825,7 @@ class Spectrum(MsData):
         """
         if self._peak_dict["reprofiled"] is not None:
             reprofiled_peaks = self.peaks("reprofiled")
-            if isinstance(reprofiled_peaks, np.ndarray):
+            if isinstance(reprofiled_peaks, np.ndarray): # type: ignore
                 i_array = reprofiled_peaks[:, 1]
                 mz_array = reprofiled_peaks[:, 0]
             else:
@@ -1006,7 +1005,7 @@ class Spectrum(MsData):
         """
         return (mz - PROTON_MASS) * charge
 
-    def _set_params_from_reference_group(self, ref_element: ElementTree.Element) -> None:
+    def set_params_from_reference_group(self, ref_element: ElementTree.Element) -> None:
         """Set parameters from reference group."""
         if self.element is None:
             return

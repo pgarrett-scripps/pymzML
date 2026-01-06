@@ -57,20 +57,4 @@ class SQLiteDatabase(object):
         return num
 
     def read(self, size: int = -1) -> str:
-        # implement read so it starts reading in first ID,
-        # if end reached switches to next id and so on ...
-
         return '<spectrum index="0" id="controllerType=0 controllerNumber=1 scan=1" defaultArrayLength="917"></spectrum>\n'
-
-
-if __name__ == "__main__":
-    # This is what the Reader class does
-    my_iter = iter(et.iterparse(SQLiteDatabase("test.db")))
-    # Now you can iter your database
-    for x in my_iter:
-        print(x)
-
-    # Retrieve a specific spectrum from your database
-    db = SQLiteDatabase("test.db")
-    unique_id = 5
-    my_spec = db[unique_id]

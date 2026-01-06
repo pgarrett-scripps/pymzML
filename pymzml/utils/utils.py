@@ -4,12 +4,14 @@ Additional functions for converting file etc.
 @author M. Kösters
 """
 
-from pymzml.utils.gzip_writer import GzipWriter
+
 import pymzml.regex_patterns as regex_patterns
 import re
 import gzip
 from typing import Dict, Callable, Union, IO
 
+from .gzip_writer import GzipWriter
+from ..constants import FileExtension, SpecialID, XMLTag
 
 def index_gzip(
     pathIn: str,
@@ -34,9 +36,9 @@ def index_gzip(
             needs to  be 1 <= x <= 9
     """
     fileOpen: Callable[[str, str], IO[str]]
-    if pathIn.endswith("gz"):
+    if pathIn.endswith(FileExtension.GZ):
         fileOpen = gzip.open  # type: ignore
-    elif pathIn.lower().endswith("mzml"):
+    elif pathIn.lower().endswith(FileExtension.MZML):
         fileOpen = open
     else:
         raise ValueError(f"Unsupported file format for {pathIn}")
@@ -50,11 +52,11 @@ def index_gzip(
     ) as Writer:
         with fileOpen(pathIn, "rt") as Reader:  # type: ignore
             data = ""
-            nativeID: Union[int, str] = "unknown"
+            nativeID: Union[int, str] = SpecialID.UNKNOWN
             for line in Reader:
                 line_stripped = line.strip()
 
-                if line_stripped.startswith("<spectrum "):
+                if line_stripped.startswith(XMLTag.SPECTRUM_OPEN):
                     data += line
                     match = re.search(regex_patterns.SPECTRUM_TAG_PATTERN, line)
                     if match:
@@ -63,15 +65,15 @@ def index_gzip(
                         if id_match:
                             nativeID = int(id_match.group(1))
 
-                elif line_stripped.startswith("</spectrum>"):
+                elif line_stripped.startswith(XMLTag.SPECTRUM_CLOSE):
                     data += line
                     Writer.add_data(data, nativeID)
                     if verbose:
                         print(f"NativeID : {nativeID}", end="\r")
                     data = ""
-                    nativeID = "unknown"
+                    nativeID = SpecialID.UNKNOWN
 
-                elif line_stripped.startswith("<chromatogram "):
+                elif line_stripped.startswith(XMLTag.CHROMATOGRAM_OPEN):
                     data += line
                     match = re.search(regex_patterns.CHROMATOGRAM_ID_PATTERN, line)
                     if match:
@@ -79,36 +81,36 @@ def index_gzip(
                         if verbose:
                             print("found chromatogram")
 
-                elif line_stripped.startswith("</chromatogram>"):
+                elif line_stripped.startswith(XMLTag.CHROMATOGRAM_CLOSE):
                     data += line
                     Writer.add_data(data, nativeID)
                     if verbose:
                         print("found chromatogram")
                         print(f"NativeID: {nativeID}")
                     data = ""
-                    nativeID = "unknown"
+                    nativeID = SpecialID.UNKNOWN
 
-                elif line_stripped.startswith("<spectrumL"):
+                elif line_stripped.startswith(XMLTag.SPECTRUM_LIST):
                     data += line
-                    Writer.add_data(data, "Head")
+                    Writer.add_data(data, SpecialID.HEAD)
                     if verbose:
-                        print("NativeID :", "Head")
+                        print("NativeID :", SpecialID.HEAD)
                     data = ""
 
-                elif line_stripped.startswith("<chromatogramL"):
+                elif line_stripped.startswith(XMLTag.CHROMATOGRAM_LIST):
                     data += line
-                    Writer.add_data(data, "junk")
+                    Writer.add_data(data, SpecialID.JUNK)
                     if verbose:
-                        print("NativeID :", "junk")
+                        print("NativeID :", SpecialID.JUNK)
                     data = ""
 
                 else:
                     data += line
 
             if data:
-                Writer.add_data(data, "tail")
+                Writer.add_data(data, SpecialID.TAIL)
                 if verbose:
-                    print("NativeID :", "tail")
+                    print("NativeID :", SpecialID.TAIL)
         Writer.write_index()
 
 
@@ -143,11 +145,11 @@ def index(
     ) as Writer:
         with gzip.open(pathIn, "rt") as Reader:  # type: ignore
             data = ""
-            nativeID: Union[int, str] = "unknown"
+            nativeID: Union[int, str] = SpecialID.UNKNOWN
             for line in Reader:
                 line_stripped = line.strip()
 
-                if line_stripped.startswith("<spectrum "):
+                if line_stripped.startswith(XMLTag.SPECTRUM_OPEN):
                     data += line
                     match = re.search(regex_patterns.SPECTRUM_TAG_PATTERN, line)
                     if match:
@@ -156,48 +158,48 @@ def index(
                         if id_match:
                             nativeID = int(id_match.group(0))
 
-                elif line_stripped.startswith("</spectrum>"):
+                elif line_stripped.startswith(XMLTag.SPECTRUM_CLOSE):
                     data += line
                     Writer.add_data(data, nativeID)
                     data = ""
-                    nativeID = "unknown"
+                    nativeID = SpecialID.UNKNOWN
 
-                elif line_stripped.startswith("<chromatogram "):
+                elif line_stripped.startswith(XMLTag.CHROMATOGRAM_OPEN):
                     data += line
                     match = re.search(regex_patterns.CHROMATOGRAM_ID_PATTERN, line)
                     if match:
                         nativeID = match.group(1)
 
-                elif line_stripped.startswith("</chromatogram>"):
+                elif line_stripped.startswith(XMLTag.CHROMATOGRAM_CLOSE):
                     data += line
                     Writer.add_data(data, nativeID)
                     if verbose:
                         print("found chromo")
                         print(f"NativeID : {nativeID}", end="\r")
                     data = ""
-                    nativeID = "unknown"
+                    nativeID = SpecialID.UNKNOWN
 
-                elif line_stripped.startswith("<spectrumL"):
+                elif line_stripped.startswith(XMLTag.SPECTRUM_LIST):
                     data += line
-                    Writer.add_data(data, "Head")
+                    Writer.add_data(data, SpecialID.HEAD)
                     if verbose:
-                        print("NativeID :", "Head")
+                        print("NativeID :", SpecialID.HEAD)
                     data = ""
 
-                elif line_stripped.startswith("<chromatogramL"):
+                elif line_stripped.startswith(XMLTag.CHROMATOGRAM_LIST):
                     data += line
-                    Writer.add_data(data, "junk")
+                    Writer.add_data(data, SpecialID.JUNK)
                     if verbose:
-                        print("NativeID :", "junk")
+                        print("NativeID :", SpecialID.JUNK)
                     data = ""
 
                 else:
                     data += line
 
             if data:
-                Writer.add_data(data, "tail")
+                Writer.add_data(data, SpecialID.TAIL)
                 if verbose:
-                    print("NativeID :", "tail")
+                    print("NativeID :", SpecialID.TAIL)
         Writer.write_index()
 
 

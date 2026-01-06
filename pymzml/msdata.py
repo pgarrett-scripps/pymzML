@@ -278,19 +278,6 @@ class MsData(object):
             np.float64
         )
 
-    # Legacy compatibility methods for tests
-    def _decode_to_numpy(
-        self, data: bytes, d_array_length: str, data_type: str, comp: list[str]
-    ) -> NDArray[np.float64]:
-        """Legacy method for backward compatibility."""
-        return self._decode(data, d_array_length, data_type, comp)
-
-    def _decode_to_tuple(
-        self, data: bytes, d_array_length: str, data_type: str, comp: list[str]
-    ) -> NDArray[np.float64]:
-        """Legacy method for backward compatibility."""
-        return self._decode(data, d_array_length, data_type, comp)
-
     def _decode_numpress(self, data: bytes, compression: list[str]) -> NDArray[np.float64]:
         """
         Decode numpress encoded data (golomb-rice encoding).
@@ -306,10 +293,9 @@ class MsData(object):
         comp_ms_tags: list[str] = []
         for comp in compression:
             obo_entry = self.obo_translator[comp]
-            if obo_entry is not None and isinstance(obo_entry, dict):
-                entry_id: str | None = obo_entry.get("id")
-                if entry_id:
-                    comp_ms_tags.append(entry_id)
+            if isinstance(obo_entry, dict) and (entry_id := obo_entry.get("id")): # type: ignore
+                comp_ms_tags.append(entry_id) # type: ignore
+                
         data_array = np.frombuffer(data, dtype=np.uint8)
 
         if MSAccession.NUMPRESS_LINEAR in comp_ms_tags:
@@ -324,7 +310,7 @@ class MsData(object):
     def _array(self, data: list[Any] | NDArray[Any]) -> NDArray[np.float64]:
         """Convert data to numpy array if needed."""
         if isinstance(data, np.ndarray):
-            return data.astype(np.float64) if data.dtype != np.float64 else data
+            return data.astype(np.float64) if data.dtype != np.float64 else data # type: ignore
         return np.array(data, dtype=np.float64)
 
     def _median(self, data: list[float] | NDArray[np.float64]) -> float:

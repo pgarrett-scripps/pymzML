@@ -88,6 +88,81 @@ class SpectrumType(StrEnum):
     CENTROID = "centroid spectrum"
 
 
+class OBOKey(StrEnum):
+    """Enumeration of OBO dictionary keys."""
+
+    ID = "id"
+    NAME = "name"
+    DEFINITION = "def"
+
+
+class OBOSection(StrEnum):
+    """Enumeration of OBO file sections."""
+
+    TERM = "[Term]"
+
+
+class FileExtension(StrEnum):
+    """Enumeration of file extensions."""
+
+    GZ = ".gz"
+    OBO = ".obo"
+    MZML = ".mzml"
+
+
+class XMLTag(StrEnum):
+    """Enumeration of XML tag names for parsing."""
+
+    SPECTRUM_OPEN = "<spectrum "
+    SPECTRUM_CLOSE = "</spectrum>"
+    CHROMATOGRAM_OPEN = "<chromatogram "
+    CHROMATOGRAM_CLOSE = "</chromatogram>"
+    SPECTRUM_LIST = "<spectrumL"
+    CHROMATOGRAM_LIST = "<chromatogramL"
+
+
+class SpecialID(StrEnum):
+    """Enumeration of special identifier strings."""
+
+    UNKNOWN = "unknown"
+    HEAD = "Head"
+    TAIL = "tail"
+    JUNK = "junk"
+
+
+class ChromatogramMSAccession(StrEnum):
+    """Enumeration of MS accessions for chromatogram properties."""
+
+    POSITIVE_SCAN = "MS:1000129"
+    NEGATIVE_SCAN = "MS:1000130"
+    ISOLATION_WINDOW_TARGET_MZ = "MS:1000827"
+
+
+class XMLNamespace(StrEnum):
+    """Enumeration of XML namespace identifiers."""
+
+    SCHEMA_LOCATION = "{http://www.w3.org/2001/XMLSchema-instance}schemaLocation"
+
+
+class MzMLElement(StrEnum):
+    """Enumeration of mzML element tag names (without namespace)."""
+
+    MZML = "mzML"
+    CV = "cv"
+    FILE_DESCRIPTION = "fileDescription"
+    SAMPLE_LIST = "sampleList"
+    REFERENCEABLE_PARAM_GROUP_LIST = "referenceableParamGroupList"
+    SOFTWARE_LIST = "softwareList"
+    INSTRUMENT_CONFIG_LIST = "instrumentConfigurationList"
+    DATA_PROCESSING_LIST = "dataProcessingList"
+    CV_PARAM = "cvParam"
+    SPECTRUM_LIST = "spectrumList"
+    CHROMATOGRAM_LIST = "chromatogramList"
+    RUN = "run"
+    SPECTRUM = "spectrum"
+    CHROMATOGRAM = "chromatogram"
+
+
 PROTON_MASS = 1.00727646677
 ISOTOPE_AVERAGE_DIFFERENCE = 1.002
 

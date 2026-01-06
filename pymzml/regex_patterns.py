@@ -6,44 +6,25 @@ from typing import Pattern
 SPECTRUM_INDEX_PATTERN: Pattern[bytes] = re.compile(
     b'(?P<type>(scan=|nativeID="))(?P<nativeID>[0-9]*)">"(?P<offset>[0-9]*)</offset>'
 )
-"""
-Regex pattern for spectrum index
-works for obo format 1.1.0 until <last version checked>
-
-Catches:
-    #. demo 1
-    #. demo 2
-"""
-
 
 SIM_INDEX_PATTERN: Pattern[bytes] = re.compile(
     b'(?P<type>idRef=")(?P<nativeID>.*)">(?P<offset>[0-9]*)</offset>'
 )
-"""
-Regex pattern for SIM index
-"""
+"""Regex pattern for SIM index"""
 SPECTRUM_PATTERN3: Pattern[str] = re.compile(r"(\w+)=(\w+)")
 SPECTRUM_ID_PATTERN: Pattern[str] = re.compile(r'="{0,1}([0-9]*)"{0,1}>{0,1}$')
 SPECTRUM_ID_PATTERN2: Pattern[str] = re.compile(r"(scan|scanId)=(\d+)")
-"""
-Simplified spectrum id regex. Greedly catches ints at the end of line
-"""
+"""Simplified spectrum id regex. Greedly catches ints at the end of line"""
 
 FILE_ENCODING_PATTERN: Pattern[bytes] = re.compile(b'encoding="(?P<encoding>[A-Za-z0-9-]*)"')
-"""
-Regex to catch xml file encoding
-"""
+"""Regex to catch xml file encoding"""
 
 MOBY_DICK_CHAPTER_PATTERN: Pattern[str] = re.compile(r"CHAPTER ([0-9]+).*")
-"""
-Regex to catch moby dick chapter number used in the index gezip writer example.
-"""
+"""Regex to catch moby dick chapter number used in the index gezip writer example."""
 SPECTRUM_OPEN_PATTERN: Pattern[bytes] = re.compile(
     b'<*spectrum[^>]*(index|id)="(.*?)".*(index|id)="(.*?)"'
 )
-"""
-Regex to catch specturm open xml tag with encoded array length
-"""
+"""Regex to catch specturm open xml tag with encoded array length"""
 
 SPECTRUM_OPEN_PATTERN_SIMPLE: Pattern[bytes] = re.compile(rb"<spectrum ")
 SPECTRUM_ID_PATTERN_SIMPLE: Pattern[bytes] = re.compile(rb"<*spectrum[^>]*id=\"(?P<id>[^\"]+)\"")
@@ -80,3 +61,6 @@ INDEX_LIST_OFFSET_PATTERN: Pattern[bytes] = re.compile(
 CHROMATOGRAM_OFFSET_PATTERN: Pattern[bytes] = re.compile(
     b'(?P<WTF>[nativeID|idRef])="TIC">(?P<offset>[0-9]*)</offset'
 )
+
+MZML_VERSION_PATTERN: Pattern[str] = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
+"""Regex to extract version numbers from mzML schema location"""

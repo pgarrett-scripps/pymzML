@@ -5,6 +5,7 @@ Interface for mzML files
 
 @author: Manuel Koesters
 """
+from pathlib import Path
 
 from io import BytesIO
 from typing import Any, Pattern
@@ -17,7 +18,7 @@ class FileInterface(object):
 
     def __init__(
         self,
-        path: str | BytesIO,
+        path: str | Path | BytesIO,
         encoding: str,
         build_index_from_scratch: bool = False,
         index_regex: Pattern[bytes] | None = None,
@@ -28,6 +29,8 @@ class FileInterface(object):
         Arguments:
             path (Union[str, BytesIO]): path to the mzML file or BytesIO object
             encoding (str)             : encoding of the file
+            build_index_from_scratch (bool): whether to build the index from scratch or use existing one
+            index_regex (Pattern[bytes] | None): regex pattern to find index entries
 
         """
         self.build_index_from_scratch: bool = build_index_from_scratch
@@ -46,7 +49,7 @@ class FileInterface(object):
         self.file_handler.close()
 
     def _open(
-        self, path_or_file: str | BytesIO
+        self, path_or_file: str | Path | BytesIO
     ) -> (
         standardMzml.StandardMzml
         | standardGzip.StandardGzip
@@ -57,7 +60,7 @@ class FileInterface(object):
         Open a file like object resp. a wrapper for a file like object.
 
         Arguments:
-            path (str): path to the mzml file
+            path_or_file (str | BytesIO): path to the mzml file or file object
 
         Returns:
             file_handler: instance of
@@ -68,6 +71,8 @@ class FileInterface(object):
         """
         if isinstance(path_or_file, BytesIO):
             return bytesMzml.BytesMzml(path_or_file, self.encoding, self.build_index_from_scratch)
+        if isinstance(path_or_file, Path):
+            path_or_file = str(path_or_file)
         if path_or_file.endswith(".gz"):
             if self._indexed_gzip(path_or_file):
                 return indexedGzip.IndexedGzip(path_or_file, self.encoding)
@@ -117,6 +122,4 @@ class FileInterface(object):
         Returns:
             data (str): text associated with the given identifier
         """
-        # if type(self.offset_dict) == dict:
-        #     self.offset_dict.update(self.file_handler.offset_dict)
         return self.file_handler[identifier]
