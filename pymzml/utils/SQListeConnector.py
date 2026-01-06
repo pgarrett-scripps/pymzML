@@ -18,7 +18,7 @@ def create_database_from_file(db_name: str, file_path: str):
     return True
 
 
-class SQLiteDatabase(object):
+class SQLiteDatabase:
     """
     Example implementation of a database Connector,
     which can be used to make :py:func:`pymzml.run.Reader` accept paths to
@@ -33,7 +33,7 @@ class SQLiteDatabase(object):
         connection = sqlite3.connect(path)
         self.cursor = connection.cursor()
 
-    def __getitem__(self, key: Union[str, int]) -> Union[spec.Spectrum, chromatogram.Chromatogram]:
+    def __getitem__(self, key: str | int) -> spec.Spectrum | chromatogram.Chromatogram:
         """
         Execute a SQL request, process the data and return a spectrum object.
 
@@ -49,7 +49,7 @@ class SQLiteDatabase(object):
             return spec.Spectrum(element)
         elif "chromatogram" in element.tag:
             return chromatogram.Chromatogram(element)
-        raise KeyError("No spectrum or chromatogram with id {0} found".format(key))
+        raise KeyError(f"No spectrum or chromatogram with id {key} found")
 
     def get_spectrum_count(self):
         self.cursor.execute("SELECT COUNT(*) from spectra")

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 import os
 import sys
@@ -24,7 +23,7 @@ def main(mzml_file):
     pf.new_plot()
     pf.add(run["TIC"].peaks(), color=(0, 0, 0), style="lines", title=mzml_basename)
     pf.save(
-        "chromatogram_{0}.html".format(mzml_basename),
+        f"chromatogram_{mzml_basename}.html",
         layout={
             "xaxis": {
                 "title": "Retention time",

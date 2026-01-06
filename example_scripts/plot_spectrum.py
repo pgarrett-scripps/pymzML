@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 import os
 
@@ -25,7 +24,7 @@ def main():
     for spec in run:
         p.new_plot()
         p.add(spec.peaks("centroided"), color=(0, 0, 0), style="sticks", name="peaks")
-        filename = "example_plot_{0}_{1}.html".format(
+        filename = "example_plot_{}_{}.html".format(
             os.path.basename(example_file), spec.ID
         )
         p.save(
@@ -49,7 +48,7 @@ def main():
                 "paper_bgcolor": "rgba(255, 255, 255, 0)",
             },
         )
-        print("Plotted file: {0}".format(filename))
+        print(f"Plotted file: {filename}")
         break
 
 

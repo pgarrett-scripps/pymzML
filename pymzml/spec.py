@@ -225,7 +225,7 @@ class Spectrum(MsData):
         """Returns representative string for a spectrum object class"""
         return f"<__main__.Spectrum object with native ID {self.ID} at {hex(id(self))}>"
 
-    @lru_cache()
+    @lru_cache
     def __getitem__(self, accession: str) -> str | float | bool | list[str | float] | None:
         """
         Access spectrum XML information by tag name

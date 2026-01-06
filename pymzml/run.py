@@ -18,7 +18,9 @@ import os
 import xml.etree.ElementTree as ElementTree
 from collections import defaultdict as ddict
 from pathlib import Path
-from typing import Any, Iterator, Pattern, Match
+from typing import Any
+from collections.abc import Iterator
+from re import Pattern, Match
 from io import BytesIO
 
 from . import spec
@@ -29,7 +31,7 @@ from .file_interface import FileInterface
 from .constants import MzMLElement, XMLNamespace
 
 
-class Reader(object):
+class Reader:
     """
     Initialize Reader object for a given mzML file.
 
@@ -336,7 +338,7 @@ class Reader(object):
             obo_file: str = os.path.join(
                 obo_root,
                 "obo",
-                "psi-ms{0}.obo".format("-" + version_fixed if version_fixed else ""),
+                "psi-ms{}.obo".format("-" + version_fixed if version_fixed else ""),
             )
             if os.path.exists(obo_file) or os.path.exists(obo_file + ".gz"):
                 pass

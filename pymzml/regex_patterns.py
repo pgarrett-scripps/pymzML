@@ -1,7 +1,7 @@
 """Collection of regular expressions to catch spectrum XML-tags."""
 
 import re
-from typing import Pattern
+from re import Pattern
 
 SPECTRUM_INDEX_PATTERN: Pattern[bytes] = re.compile(
     b'(?P<type>(scan=|nativeID="))(?P<nativeID>[0-9]*)">"(?P<offset>[0-9]*)</offset>'

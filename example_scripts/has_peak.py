@@ -22,7 +22,7 @@ def main():
     for spectrum in run:
         found_peaks = spectrum.has_peak(mz_to_find)
         if found_peaks != []:
-            print("Found peaks: {0} in spectrum {1}".format(found_peaks, spectrum.ID))
+            print(f"Found peaks: {found_peaks} in spectrum {spectrum.ID}")
 
 
 if __name__ == "__main__":

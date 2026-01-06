@@ -224,7 +224,7 @@ class GzipWriter:
             print(
                 """
                 WARNING: Reached maximum number of indexed data blocks
-                '({0}), cannot add any more data!
+                '({}), cannot add any more data!
                 """.format(self.max_idx_num)
             )
             return False

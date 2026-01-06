@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Interface for mzML files
 
@@ -8,12 +7,13 @@ Interface for mzML files
 from pathlib import Path
 
 from io import BytesIO
-from typing import Any, Pattern
+from typing import Any
+from re import Pattern
 from pymzml.file_classes import indexedGzip, standardGzip, standardMzml, bytesMzml
 from pymzml.utils import gzip_reader
 
 
-class FileInterface(object):
+class FileInterface:
     """Interface to different mzML formats."""
 
     def __init__(

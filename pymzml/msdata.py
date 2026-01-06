@@ -29,7 +29,7 @@ from .obo import OboTranslator
 from .decoder import MSDecoder
 
 
-class MsData(object):
+class MsData:
     """
     General base class for mass spectrometry data handling.
     Provides common functionality for both Spectrum and Chromatogram classes.

@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-# encoding: utf-8
 """
 Class to parse the obo file and set up the accessions library
 
@@ -61,12 +59,13 @@ import os
 import re
 import gzip
 import urllib.request
-from typing import Any, ClassVar, Pattern
+from typing import Any, ClassVar
+from re import Pattern
 
 from .constants import OBOKey, OBOSection, FileExtension
 
 
-class OboTranslator(object):
+class OboTranslator:
     """
     Generates a mapping from MS:xxxxx to names and vice versa for a specific
     obo version

@@ -1,4 +1,4 @@
-.PHONY: help install install-dev sync test test-verbose coverage clean docs example-scripts build lint format check benchmark test-large
+.PHONY: help install install-dev sync test test-verbose coverage clean docs example-scripts build lint format check benchmark test-large upgrade
 
 # Default target
 help:
@@ -24,11 +24,12 @@ help:
 	@echo "  make build            - Build the package"
 	@echo "  make clean            - Clean build artifacts and cache files"
 	@echo ""
-	@echo "Code quality commands:"
-	@echo "  make lint             - Run linters (if configured)"
-	@echo "  make format           - Format code (if configured)"
-	@echo "  make check            - Run all checks"
-	@echo "  make ty               - Run type checking with ty"
+	echo "Code quality commands:"
+	echo "  make lint             - Run linters (if configured)"
+	echo "  make format           - Format code (if configured)"
+	echo "  make check            - Run all checks"
+	echo "  make ty               - Run type checking with ty"
+	echo "  make upgrade          - Upgrade Python syntax with pyupgrade"
 
 # Installation
 install:
@@ -108,3 +109,8 @@ check: lint test
 
 ty: 
 	uv run --python-preference managed ty check pymzml
+
+upgrade:
+	@echo "Upgrading Python syntax to 3.11+..."
+	@find pymzml tests example_scripts -name "*.py" -type f -exec uv run --python-preference managed pyupgrade --py311-plus {} +
+	@echo "Python syntax upgraded to 3.11+"

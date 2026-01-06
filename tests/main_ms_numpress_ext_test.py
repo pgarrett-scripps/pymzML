@@ -89,7 +89,7 @@ class test_MSNumpress(unittest.TestCase):
     def test_encode_pic_i_data(self):
         encoded_array = pynumpress.encode_pic(np.asarray(self.i_data, dtype=np.float64))
 
-        self.assertEqual(len(encoded_array), 14, msg="{}".format([hex(x) for x in encoded_array]))
+        self.assertEqual(len(encoded_array), 14, msg=f"{[hex(x) for x in encoded_array]}")
 
         self.assertEqual(encoded_array[0], 0x20)
         self.assertEqual(encoded_array[1], 0x4B)
@@ -127,7 +127,7 @@ class test_MSNumpress(unittest.TestCase):
         self.assertCountEqual(
             decoded_array,
             self.i_data,
-            msg="{}\n{}".format([x for x in decoded_array], [x for x in self.i_data]),
+            msg=f"{[x for x in decoded_array]}\n{[x for x in self.i_data]}",
         )
 
     def test_encode_decode_pic(self):
@@ -143,7 +143,7 @@ class test_MSNumpress(unittest.TestCase):
         self.assertEqual(
             len(encoded_array),
             23,
-            msg="{0}\n{1}".format(
+            msg="{}\n{}".format(
                 [hex(x) for x in encoded_array],
                 [
                     "0x41",
@@ -177,7 +177,7 @@ class test_MSNumpress(unittest.TestCase):
         self.assertEqual(
             0xFF & encoded_array[8],
             0xF6,
-            msg="Fail in value at pos {0}: {1} != {2}".format(
+            msg="Fail in value at pos {}: {} != {}".format(
                 8, hex(0xFF & encoded_array[8]), hex(0xF6)
             ),
         )
@@ -185,21 +185,21 @@ class test_MSNumpress(unittest.TestCase):
         self.assertEqual(
             0xFF & encoded_array[9],
             0xFF,
-            msg="Fail in value at pos {0}: {1} != {2}".format(
+            msg="Fail in value at pos {}: {} != {}".format(
                 9, hex(0xFF & encoded_array[9]), hex(0xFF)
             ),
         )
         self.assertEqual(
             0xFF & encoded_array[10],
             0xFF,
-            msg="Fail in value at pos {0}: {1} != {2}".format(
+            msg="Fail in value at pos {}: {} != {}".format(
                 10, hex(0xFF & encoded_array[10]), hex(0xFF)
             ),
         )
         self.assertEqual(
             0xFF & encoded_array[11],
             0x7F,
-            msg="Fail in value at pos {0}: {1} != {2}".format(
+            msg="Fail in value at pos {}: {} != {}".format(
                 11, hex(0xFF & encoded_array[11]), hex(0x7F)
             ),
         )
@@ -208,28 +208,28 @@ class test_MSNumpress(unittest.TestCase):
         self.assertEqual(
             0xFF & encoded_array[12],
             0xC2,
-            msg="Fail in value at pos {0}: {1} != {2}".format(
+            msg="Fail in value at pos {}: {} != {}".format(
                 12, hex(0xFF & encoded_array[12]), hex(0xC2)
             ),
         )
         self.assertEqual(
             0xFF & encoded_array[13],
             0x89,
-            msg="Fail in value at pos {0}: {1} != {2}".format(
+            msg="Fail in value at pos {}: {} != {}".format(
                 13, hex(0xFF & encoded_array[13]), hex(0x89)
             ),
         )
         self.assertEqual(
             0xFF & encoded_array[14],
             0xE2,
-            msg="Fail in value at pos {0}: {1} != {2}".format(
+            msg="Fail in value at pos {}: {} != {}".format(
                 14, hex(0xFF & encoded_array[14]), hex(0xE2)
             ),
         )
         self.assertEqual(
             0xFF & encoded_array[15],
             0x7F,
-            msg="Fail in value at pos {0}: {1} != {2}".format(
+            msg="Fail in value at pos {}: {} != {}".format(
                 15, hex(0xFF & encoded_array[15]), hex(0x7F)
             ),
         )
@@ -238,28 +238,28 @@ class test_MSNumpress(unittest.TestCase):
         self.assertEqual(
             0xFF & encoded_array[16],
             0x2B,
-            msg="Fail in value at pos {0}: {1} != {2}".format(
+            msg="Fail in value at pos {}: {} != {}".format(
                 16, hex(0xFF & encoded_array[16]), hex(0x2B)
             ),
         )
         self.assertEqual(
             0xFF & encoded_array[17],
             0xF3,
-            msg="Fail in value at pos {0}: {1} != {2}".format(
+            msg="Fail in value at pos {}: {} != {}".format(
                 17, hex(0xFF & encoded_array[17]), hex(0xC2)
             ),
         )
         self.assertEqual(
             0xFF & encoded_array[18],
             0x8A,
-            msg="Fail in value at pos {0}: {1} != {2}".format(
+            msg="Fail in value at pos {}: {} != {}".format(
                 18, hex(0xFF & encoded_array[18]), hex(0x8A)
             ),
         )
         self.assertEqual(
             0xFF & encoded_array[19],
             0x13,
-            msg="Fail in value at pos {0}: {1} != {2}".format(
+            msg="Fail in value at pos {}: {} != {}".format(
                 19, hex(0xFF & encoded_array[19]), hex(0x13)
             ),
         )
@@ -268,14 +268,14 @@ class test_MSNumpress(unittest.TestCase):
         self.assertEqual(
             0xFF & encoded_array[20],
             0xDC,
-            msg="Fail in value at pos {0}: {1} != {2}".format(
+            msg="Fail in value at pos {}: {} != {}".format(
                 19, hex(0xFF & encoded_array[20]), hex(0xDC)
             ),
         )
         self.assertEqual(
             0xFF & encoded_array[21],
             0x6A,
-            msg="Fail in value at pos {0}: {1} != {2}".format(
+            msg="Fail in value at pos {}: {} != {}".format(
                 19, hex(0xFF & encoded_array[21]), hex(0x6A)
             ),
         )
@@ -365,7 +365,7 @@ class test_MSNumpress(unittest.TestCase):
                 decoded_array[i],
                 test_array[i],
                 places=4,
-                msg="error at pos {0}".format(i),
+                msg=f"error at pos {i}",
             )
 
     def test_encode_decode_self_mz(self):
@@ -378,7 +378,7 @@ class test_MSNumpress(unittest.TestCase):
                 decoded_mz_data[i],
                 mz_data[i],
                 places=4,
-                msg="error at pos {0}".format(i),
+                msg=f"error at pos {i}",
             )
 
 

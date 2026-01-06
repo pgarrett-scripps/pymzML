@@ -6,7 +6,8 @@ Interface for binary streams of uncompressed mzML.
 
 from collections import OrderedDict
 from io import TextIOWrapper, BytesIO
-from typing import TextIO, Pattern
+from typing import TextIO
+from re import Pattern
 
 from .. import regex_patterns
 from .standardMzml import StandardMzml

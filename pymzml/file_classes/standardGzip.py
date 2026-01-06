@@ -11,7 +11,7 @@ from .. import spec
 from .. import chromatogram
 
 
-class StandardGzip(object):
+class StandardGzip:
     def __init__(self, path: str, encoding: str) -> None:
         """
         Initalize Wrapper object for gzipped mzML files.

@@ -53,8 +53,8 @@ class IndexedGzip:
         return self.file_handler.read(size)
 
     def __getitem__(
-        self, identifier: Union[int, str]
-    ) -> Union[spec.Spectrum, chromatogram.Chromatogram]:
+        self, identifier: int | str
+    ) -> spec.Spectrum | chromatogram.Chromatogram:
         """
         Access the item with id 'identifier' in the file.
 

@@ -9,14 +9,16 @@ import bisect
 import re
 import os
 from xml.etree.ElementTree import XML, iterparse
-from typing import BinaryIO, TextIO, Pattern, Match, Iterator
+from typing import BinaryIO, TextIO
+from collections.abc import Iterator
+from re import Pattern, Match
 
 from .. import spec
 from .. import chromatogram
 from .. import regex_patterns
 
 
-class StandardMzml(object):
+class StandardMzml:
     """ """
 
     def __init__(
@@ -47,7 +49,7 @@ class StandardMzml(object):
         return open(self.path, "rb")
 
     def get_file_handler(self, encoding: str) -> TextIO:
-        return open(self.path, mode="r", encoding=encoding)
+        return open(self.path, encoding=encoding)
 
     def __getitem__(
         self, identifier: int | str
@@ -715,7 +717,7 @@ class StandardMzml(object):
             # NOTE: This needs to go intp regex_patterns.py
 
             regex_string = re.compile(
-                '<\\s*spectrum[^>]*index="[0-9]+"\\sid="({0})"\\sdefaultArrayLength="[0-9]+">'.format(
+                '<\\s*spectrum[^>]*index="[0-9]+"\\sid="({})"\\sdefaultArrayLength="[0-9]+">'.format(
                     "".join([".*", search_string, ".*"])
                 ).encode()
             )

@@ -8,7 +8,8 @@ Additional functions for converting file etc.
 import pymzml.regex_patterns as regex_patterns
 import re
 import gzip
-from typing import Dict, Callable, Union, IO
+from typing import Dict, Union, IO
+from collections.abc import Callable
 
 from .gzip_writer import GzipWriter
 from ..constants import FileExtension, SpecialID, XMLTag
@@ -52,7 +53,7 @@ def index_gzip(
     ) as Writer:
         with fileOpen(pathIn, "rt") as Reader:  # type: ignore
             data = ""
-            nativeID: Union[int, str] = SpecialID.UNKNOWN
+            nativeID: int | str = SpecialID.UNKNOWN
             for line in Reader:
                 line_stripped = line.strip()
 
@@ -145,7 +146,7 @@ def index(
     ) as Writer:
         with gzip.open(pathIn, "rt") as Reader:  # type: ignore
             data = ""
-            nativeID: Union[int, str] = SpecialID.UNKNOWN
+            nativeID: int | str = SpecialID.UNKNOWN
             for line in Reader:
                 line_stripped = line.strip()
 
@@ -203,7 +204,7 @@ def index(
         Writer.write_index()
 
 
-def make_obo_mapping(obo: str, reversed: bool = False) -> Dict[str, str]:
+def make_obo_mapping(obo: str, reversed: bool = False) -> dict[str, str]:
     """
     Create a mapping dictionary from an OBO file.
 
@@ -214,7 +215,7 @@ def make_obo_mapping(obo: str, reversed: bool = False) -> Dict[str, str]:
     Returns:
         Dict[str, str]: mapping dictionary
     """
-    mapping: Dict[str, str] = {}
+    mapping: dict[str, str] = {}
     id: str = ""
     with open(obo) as obo_file:
         for line in obo_file:

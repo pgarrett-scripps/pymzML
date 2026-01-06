@@ -67,6 +67,7 @@ dev = [
     "pynumpress>=0.0.4",
     "ms_deisotope>=0.0.14",
     "ty>=0.0.9",
+    "pyupgrade>=3.21.0",
 ]
 
 [project.urls]
