@@ -1,30 +1,6 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Interface for gzipped mzML files.
 """
-
-# Python mzML module - pymzml
-# Copyright (C) 2010-2019 M. Kösters, C. Fufezan
-#     The MIT License (MIT)
-
-#     Permission is hereby granted, free of charge, to any person obtaining a copy
-#     of this software and associated documentation files (the "Software"), to deal
-#     in the Software without restriction, including without limitation the rights
-#     to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#     copies of the Software, and to permit persons to whom the Software is
-#     furnished to do so, subject to the following conditions:
-
-#     The above copyright notice and this permission notice shall be included in all
-#     copies or substantial portions of the Software.
-
-#     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#     IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#     FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#     AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-#     SOFTWARE.
 
 import codecs
 import gzip
@@ -36,7 +12,7 @@ from .. import chromatogram
 
 
 class StandardGzip(object):
-    def __init__(self, path, encoding):
+    def __init__(self, path: str, encoding: str) -> None:
         """
         Initalize Wrapper object for gzipped mzML files.
 
@@ -44,22 +20,22 @@ class StandardGzip(object):
             path (str)     : path to the file
             encoding (str) : encoding of the file
         """
-        self.path = path
+        self.path: str = path
         self.file_handler = codecs.getreader(encoding)(gzip.open(path))
-        self.offset_dict = self._build_index()
+        self.offset_dict: None = self._build_index()
         return
 
-    def close(self):
+    def close(self) -> None:
         self.file_handler.close()
 
-    def _build_index(self):
+    def _build_index(self) -> None:
         """
         Cant build index for standard gzip files
         """
         # raise Exception('Cant build index for gzip files')
         pass
 
-    def read(self, size=-1):
+    def read(self, size: int = -1) -> str:
         """
         Read binary data from file handler.
 
@@ -71,7 +47,7 @@ class StandardGzip(object):
         """
         return self.file_handler.read(size)
 
-    def __getitem__(self, identifier):
+    def __getitem__(self, identifier: int | str) -> spec.Spectrum | chromatogram.Chromatogram:
         """
         Access the item with id 'identifier' in the file by iterating the xml-tree.
 
@@ -83,27 +59,26 @@ class StandardGzip(object):
         """
         old_pos = self.file_handler.tell()
         self.file_handler.seek(0, 0)
-        mzml_iter = iter(iterparse(self.file_handler, events=["end"]))
-        while True:
-            event, element = next(mzml_iter)
+        mzml_iter = iterparse(self.file_handler, events=["end"])
+
+        for event, element in mzml_iter:
             if event == "end":
                 if element.tag.endswith("}spectrum"):
-                    if (
-                        int(
-                            regex_patterns.SPECTRUM_ID_PATTERN.search(
-                                element.get("id")
-                            ).group(1)
-                        )
-                        == identifier
-                    ):
-                        self.file_handler.seek(old_pos, 0)
-                        return spec.Spectrum(element, measured_precision=5e-6)
+                    spec_id = element.get("id")
+                    if spec_id:
+                        match = regex_patterns.SPECTRUM_ID_PATTERN.search(spec_id)
+                        if match:
+                            spec_id_num = int(match.group(1))
+                            if spec_id_num == identifier:
+                                self.file_handler.seek(old_pos, 0)
+                                return spec.Spectrum(element, measured_precision=5e-6)
                 elif element.tag.endswith("}chromatogram"):
                     if element.get("id") == identifier:
                         self.file_handler.seek(old_pos, 0)
-                        return chromatogram.Chromatogram(
-                            element, measured_precision=5e-6
-                        )
+                        return chromatogram.Chromatogram(element, measured_precision=5e-6)
+
+        # If we get here, identifier was not found
+        raise KeyError(f"Identifier '{identifier}' not found in file")
 
 
 if __name__ == "__main__":

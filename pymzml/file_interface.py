@@ -5,10 +5,11 @@ Interface for mzML files
 
 @author: Manuel Koesters
 """
+
 from io import BytesIO
-from typing import Union, Dict, Any, Optional
+from typing import Any, Pattern
 from pymzml.file_classes import indexedGzip, standardGzip, standardMzml, bytesMzml
-from pymzml.utils import GSGR
+from pymzml.utils import gzip_reader
 
 
 class FileInterface(object):
@@ -16,10 +17,10 @@ class FileInterface(object):
 
     def __init__(
         self,
-        path: Union[str, BytesIO],
+        path: str | BytesIO,
         encoding: str,
         build_index_from_scratch: bool = False,
-        index_regex: Optional[str] = None
+        index_regex: Pattern[bytes] | None = None,
     ) -> None:
         """
         Initialize a object interface to mzML files.
@@ -31,27 +32,27 @@ class FileInterface(object):
         """
         self.build_index_from_scratch: bool = build_index_from_scratch
         self.encoding: str = encoding
-        self.index_regex: Optional[str] = index_regex
-        self.file_handler: Union[
-            standardMzml.StandardMzml,
-            standardGzip.StandardGzip,
-            indexedGzip.IndexedGzip,
-            bytesMzml.BytesMzml
-        ] = self._open(path)
-        self.offset_dict: Dict[Any, Any] = self.file_handler.offset_dict or {}
+        self.index_regex: Pattern[bytes] | None = index_regex
+        self.file_handler: (
+            standardMzml.StandardMzml
+            | standardGzip.StandardGzip
+            | indexedGzip.IndexedGzip
+            | bytesMzml.BytesMzml
+        ) = self._open(path)
+        self.offset_dict: dict[Any, Any] = self.file_handler.offset_dict or {}  # type: ignore
 
     def close(self) -> None:
         """Close the internal file handler."""
         self.file_handler.close()
 
     def _open(
-        self, path_or_file: Union[str, BytesIO]
-    ) -> Union[
-        standardMzml.StandardMzml,
-        standardGzip.StandardGzip,
-        indexedGzip.IndexedGzip,
-        bytesMzml.BytesMzml
-    ]:
+        self, path_or_file: str | BytesIO
+    ) -> (
+        standardMzml.StandardMzml
+        | standardGzip.StandardGzip
+        | indexedGzip.IndexedGzip
+        | bytesMzml.BytesMzml
+    ):
         """
         Open a file like object resp. a wrapper for a file like object.
 
@@ -66,9 +67,7 @@ class FileInterface(object):
             based on the file ending of 'path'
         """
         if isinstance(path_or_file, BytesIO):
-            return bytesMzml.BytesMzml(
-                path_or_file, self.encoding, self.build_index_from_scratch
-            )
+            return bytesMzml.BytesMzml(path_or_file, self.encoding, self.build_index_from_scratch)
         if path_or_file.endswith(".gz"):
             if self._indexed_gzip(path_or_file):
                 return indexedGzip.IndexedGzip(path_or_file, self.encoding)
@@ -92,10 +91,10 @@ class FileInterface(object):
             bool : `True` if path is a gzip file with index, else `False`
         """
         indexed = False
-        indexed = GSGR.GSGR(path).indexed
+        indexed = gzip_reader.GzipReader(path).indexed
         return indexed
 
-    def read(self, size: int = -1) -> Union[bytes, str]:
+    def read(self, size: int = -1) -> bytes | str:
         """
         Read binary data from file handler.
 
@@ -108,7 +107,7 @@ class FileInterface(object):
         """
         return self.file_handler.read(size)
 
-    def __getitem__(self, identifier: Union[str, int]) -> Any:
+    def __getitem__(self, identifier: str | int) -> Any:
         """
         Access the item with id 'identifier' in the file.
 
@@ -121,7 +120,3 @@ class FileInterface(object):
         # if type(self.offset_dict) == dict:
         #     self.offset_dict.update(self.file_handler.offset_dict)
         return self.file_handler[identifier]
-
-
-if __name__ == "__main__":
-    print(__doc__)

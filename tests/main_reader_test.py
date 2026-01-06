@@ -3,11 +3,12 @@
 """
 Part of pymzml test cases
 """
+
 import os
 import re
 import pymzml.run as run
 import unittest
-from pymzml.spec import Spectrum, Chromatogram
+from pymzml import Spectrum, Chromatogram
 import test_file_paths
 
 
@@ -29,9 +30,7 @@ class runTest(unittest.TestCase):
         self.reader_uncompressed_indexed = run.Reader(file_uncompressed_indexed)
         self.reader_uncompressed_unindexed = run.Reader(file_uncompressed_unindexed)
         self.reader_bad_obo_version = run.Reader(file_bad_obo_version)
-        self.reader_set_obo_version = run.Reader(
-            file_bad_obo_version, obo_version="4.1.79"
-        )
+        self.reader_set_obo_version = run.Reader(file_bad_obo_version, obo_version="4.1.79")
         self.reader_set_year_obo_version = run.Reader(
             file_uncompressed_indexed, obo_version="23:06:2017"
         )
@@ -51,21 +50,13 @@ class runTest(unittest.TestCase):
 
     def test_determine_file_encoding(self):
         """ """
-        encoding = self.reader_compressed_indexed._determine_file_encoding(
-            self.paths[2]
-        )
+        encoding = self.reader_compressed_indexed._determine_file_encoding(self.paths[2])
         self.assertEqual(encoding, "ISO-8859-1")
-        encoding = self.reader_compressed_unindexed._determine_file_encoding(
-            self.paths[1]
-        )
+        encoding = self.reader_compressed_unindexed._determine_file_encoding(self.paths[1])
         self.assertEqual(encoding, "ISO-8859-1")
-        encoding = self.reader_uncompressed_indexed._determine_file_encoding(
-            self.paths[3]
-        )
+        encoding = self.reader_uncompressed_indexed._determine_file_encoding(self.paths[3])
         self.assertEqual(encoding, "ISO-8859-1")
-        encoding = self.reader_uncompressed_unindexed._determine_file_encoding(
-            self.paths[0]
-        )
+        encoding = self.reader_uncompressed_unindexed._determine_file_encoding(self.paths[0])
         self.assertEqual(encoding, "ISO-8859-1")
 
     def test_init_iter(self):

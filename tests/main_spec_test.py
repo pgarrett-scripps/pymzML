@@ -11,30 +11,17 @@ import unittest
 import test_file_paths
 from pprint import pprint
 
-try:
-    import numpy as np
-
-    numpy_installed = True
-except:
-    numpy_installed = False
+import numpy as np
 
 
 class SpectrumTest(unittest.TestCase):
     """ """
 
-    def assertPeaksIdentical(
-        self, peaks1, peaks2, mult=1, msg=None, measured_precision=5e-6
-    ):
-        self.assertEqual(
-            len(peaks1), len(peaks2), msg="List have different number of peaks!"
-        )
+    def assertPeaksIdentical(self, peaks1, peaks2, mult=1, msg=None, measured_precision=5e-6):
+        self.assertEqual(len(peaks1), len(peaks2), msg="List have different number of peaks!")
         for x in range(len(peaks1)):
-            self.assertAlmostEqual(
-                peaks1[x][0], peaks2[x][0], msg=msg, delta=measured_precision
-            )
-            self.assertAlmostEqual(
-                peaks1[x][1] * mult, peaks2[x][1], msg=msg, delta=5e-4
-            )
+            self.assertAlmostEqual(peaks1[x][0], peaks2[x][0], msg=msg, delta=measured_precision)
+            self.assertAlmostEqual(peaks1[x][1] * mult, peaks2[x][1], msg=msg, delta=5e-4)
 
     def setUp(self):
         """ """
@@ -66,24 +53,19 @@ class SpectrumTest(unittest.TestCase):
 
     def test_decode_to_numpy(self):
         """ """
-        if numpy_installed:
-            test_array = [100.00087, 100.00238, 100.00389, 100.00541, 119.27174]
-            b64_array = "cgDIQjgByEL+AchCxQLIQiGL7kIjjO5CJY3uQieO7kIpj+5CK5DuQi2R7kIvku5CMpPuQjeU7kI5le5CO5buQj2X7kK6QgJDTUMCQ+FDAkN0RAJDB0UCQ5pFAkMuRgJDwUYCQ1RHAkPoRwJDe0gCQw9JAkOiSQJDj/YGQyr3BkPF9wZDYfgGQ/z4BkOX+QZDM/oGQ876BkNp+wZDBfwGQ6L8BkM9/QZD2P0GQ3T+BkPmBRVDmgYVQ04HFUMCCBVDtggVQ2oJFUMfChVD0woVQ4cLFUM7DBVD8AwVQ6QNFUNYDhVDDA8VQ8EPFUN1EBVDKREVQ/UFFkOrBhZDYQcWQxcIFkPNCBZDgwkWQzkKFkPvChZDpQsWQ1sMFkMRDRZDxw0WQ34OFkM0DxZDw6gZQ4CpGUM9qhlD+aoZQ7arGUNzrBlDL60ZQ+ytGUOprhlDZq8ZQyKwGUPfsBlDnLEZQ0iiGkMGoxpDxaMaQ4OkGkNCpRpDAKYaQ7+mGkN9pxpDPKgaQ/+oGkO9qRpDfKoaQzqrGkO0o0dDy6RHQ+OlR0P6pkdDEahHQympR0NAqkdDWKtHQ2+sR0OHrUdDnq5HQ7avR0PNsEdDaT1RQ5U+UUPAP1FD7EBRQxhCUUNEQ1FDcERRQ5xFUUPHRlFD9EdRQyBJUUNLSlFDd0tRQ3p0bEPidWxDS3dsQ7N4bEMbemxDg3tsQ+t8bENTfmxDvH9sQySBbEONgmxD9YNsQ12FbEPGhmxDDn6EQ+R+hEO5f4RDj4CEQ2WBhEM6goRDEIOEQ+aDhEO7hIRDkYWEQ2eGhEM8h4RDEoiEQ5x6hUN0e4VDTHyFQyR9hUP9fYVD1X6FQ61/hUOFgIVDXYGFQzWChUMNg4VD5YOFQ72EhUOVhYVDlnaGQ3B3hkNLeIZDJXmGQwB6hkPaeoZDtHuGQ498hkNpfYZDRH6GQx5/hkP5f4ZD04CGQ66BhkOIgoZDY4OGQz2EhkMM9oZD6PaGQ8T3hkOf+IZDe/mGQ1f6hkMy+4ZDDvyGQ+r8hkPF/YZDof6GQ33/hkNYAIdDNAGHQxACh0PrAodDG9CIQ/vQiEPb0YhDu9KIQ5vTiEN71IhDXNWIQzzWiEMc14hD/NeIQ9zYiEO82YhDnNqIQ33biENvQYxDV0KMQ0BDjEMpRIxDEUWMQ/pFjEPjRoxDy0eMQ7RIjEOdSYxDhkqMQ25LjENXTIxDT3+MQzmAjEMigYxDC4KMQ/WCjEPeg4xDx4SMQ7CFjEOahoxDg4eMQ2yIjENWiYxDP4qMQyiLjEMSjIxD+4yMQ+WNjEMhAI1DCwGNQ/YBjUPgAo1DywONQ7UEjUOgBY1DigaNQ3UHjUNgCI1DSgmNQzUKjUMfC41DCgyNQ/UMjUP0fY1D4H6NQ8x/jUO3gI1Do4GNQ4+CjUN7g41DZ4SNQ1KFjUM+ho1DKoeNQxaIjUMCiY1D7YmNQ9mKjUO6eY5DqXqOQ5d7jkOFfI5Dc32OQ2F+jkNQf45DPoCOQyyBjkMago5DCYOOQ/eDjkPlhI5D1IWOQ8KGjkOwh45Dn4iOQ3n6jkNo+45DWPyOQ0f9jkM3/o5DJv+OQxYAj0MFAY9D9QGPQ+QCj0PUA49DwwSPQ7IFj0OiBo9DkQePQ4EIj0P7f5VD+4CVQ/uBlUP7gpVD+4OVQ/uElUP7hZVD+4aVQ/uHlUP7iJVD/ImVQ/yKlUP8i5VD/IyVQ/yNlUP8jpVD/I+VQ4AtmkOMLppDmC+aQ6UwmkOxMZpDvTKaQ8kzmkPVNJpD4jWaQ+42mkP6N5pDBjmaQxM6mkMfO5pDbF3DQ+pew0NpYMND52HDQw=="
+        test_array = [100.00087, 100.00238, 100.00389, 100.00541, 119.27174]
+        b64_array = "cgDIQjgByEL+AchCxQLIQiGL7kIjjO5CJY3uQieO7kIpj+5CK5DuQi2R7kIvku5CMpPuQjeU7kI5le5CO5buQj2X7kK6QgJDTUMCQ+FDAkN0RAJDB0UCQ5pFAkMuRgJDwUYCQ1RHAkPoRwJDe0gCQw9JAkOiSQJDj/YGQyr3BkPF9wZDYfgGQ/z4BkOX+QZDM/oGQ876BkNp+wZDBfwGQ6L8BkM9/QZD2P0GQ3T+BkPmBRVDmgYVQ04HFUMCCBVDtggVQ2oJFUMfChVD0woVQ4cLFUM7DBVD8AwVQ6QNFUNYDhVDDA8VQ8EPFUN1EBVDKREVQ/UFFkOrBhZDYQcWQxcIFkPNCBZDgwkWQzkKFkPvChZDpQsWQ1sMFkMRDRZDxw0WQ34OFkM0DxZDw6gZQ4CpGUM9qhlD+aoZQ7arGUNzrBlDL60ZQ+ytGUOprhlDZq8ZQyKwGUPfsBlDnLEZQ0iiGkMGoxpDxaMaQ4OkGkNCpRpDAKYaQ7+mGkN9pxpDPKgaQ/+oGkO9qRpDfKoaQzqrGkO0o0dDy6RHQ+OlR0P6pkdDEahHQympR0NAqkdDWKtHQ2+sR0OHrUdDnq5HQ7avR0PNsEdDaT1RQ5U+UUPAP1FD7EBRQxhCUUNEQ1FDcERRQ5xFUUPHRlFD9EdRQyBJUUNLSlFDd0tRQ3p0bEPidWxDS3dsQ7N4bEMbemxDg3tsQ+t8bENTfmxDvH9sQySBbEONgmxD9YNsQ12FbEPGhmxDDn6EQ+R+hEO5f4RDj4CEQ2WBhEM6goRDEIOEQ+aDhEO7hIRDkYWEQ2eGhEM8h4RDEoiEQ5x6hUN0e4VDTHyFQyR9hUP9fYVD1X6FQ61/hUOFgIVDXYGFQzWChUMNg4VD5YOFQ72EhUOVhYVDlnaGQ3B3hkNLeIZDJXmGQwB6hkPaeoZDtHuGQ498hkNpfYZDRH6GQx5/hkP5f4ZD04CGQ66BhkOIgoZDY4OGQz2EhkMM9oZD6PaGQ8T3hkOf+IZDe/mGQ1f6hkMy+4ZDDvyGQ+r8hkPF/YZDof6GQ33/hkNYAIdDNAGHQxACh0PrAodDG9CIQ/vQiEPb0YhDu9KIQ5vTiEN71IhDXNWIQzzWiEMc14hD/NeIQ9zYiEO82YhDnNqIQ33biENvQYxDV0KMQ0BDjEMpRIxDEUWMQ/pFjEPjRoxDy0eMQ7RIjEOdSYxDhkqMQ25LjENXTIxDT3+MQzmAjEMigYxDC4KMQ/WCjEPeg4xDx4SMQ7CFjEOahoxDg4eMQ2yIjENWiYxDP4qMQyiLjEMSjIxD+4yMQ+WNjEMhAI1DCwGNQ/YBjUPgAo1DywONQ7UEjUOgBY1DigaNQ3UHjUNgCI1DSgmNQzUKjUMfC41DCgyNQ/UMjUP0fY1D4H6NQ8x/jUO3gI1Do4GNQ4+CjUN7g41DZ4SNQ1KFjUM+ho1DKoeNQxaIjUMCiY1D7YmNQ9mKjUO6eY5DqXqOQ5d7jkOFfI5Dc32OQ2F+jkNQf45DPoCOQyyBjkMago5DCYOOQ/eDjkPlhI5D1IWOQ8KGjkOwh45Dn4iOQ3n6jkNo+45DWPyOQ0f9jkM3/o5DJv+OQxYAj0MFAY9D9QGPQ+QCj0PUA49DwwSPQ7IFj0OiBo9DkQePQ4EIj0P7f5VD+4CVQ/uBlUP7gpVD+4OVQ/uElUP7hZVD+4aVQ/uHlUP7iJVD/ImVQ/yKlUP8i5VD/IyVQ/yNlUP8jpVD/I+VQ4AtmkOMLppDmC+aQ6UwmkOxMZpDvTKaQ8kzmkPVNJpD4jWaQ+42mkP6N5pDBjmaQxM6mkMfO5pDbF3DQ+pew0NpYMND52HDQw=="
 
-            out_array = self.spec._decode_to_numpy(
-                b64_array, 4292, "32-bit float", "no compression"
-            )
-            val1 = round(float(test_array[1]), 3)
-            val2 = round(float(out_array[1]), 3)
-            self.assertEqual(val1, val2)
+        out_array = self.spec._decode_to_numpy(b64_array, 4292, "32-bit float", "no compression")
+        val1 = round(float(test_array[1]), 3)
+        val2 = round(float(out_array[1]), 3)
+        self.assertEqual(val1, val2)
 
     def test_decode_to_tuple(self):
         """ """
         test_array = "123"
         b64_array = "cgDIQjgByEL+AchCxQLIQiGL7kIjjO5CJY3uQieO7kIpj+5CK5DuQi2R7kIvku5CMpPuQjeU7kI5le5CO5buQj2X7kK6QgJDTUMCQ+FDAkN0RAJDB0UCQ5pFAkMuRgJDwUYCQ1RHAkPoRwJDe0gCQw9JAkOiSQJDj/YGQyr3BkPF9wZDYfgGQ/z4BkOX+QZDM/oGQ876BkNp+wZDBfwGQ6L8BkM9/QZD2P0GQ3T+BkPmBRVDmgYVQ04HFUMCCBVDtggVQ2oJFUMfChVD0woVQ4cLFUM7DBVD8AwVQ6QNFUNYDhVDDA8VQ8EPFUN1EBVDKREVQ/UFFkOrBhZDYQcWQxcIFkPNCBZDgwkWQzkKFkPvChZDpQsWQ1sMFkMRDRZDxw0WQ34OFkM0DxZDw6gZQ4CpGUM9qhlD+aoZQ7arGUNzrBlDL60ZQ+ytGUOprhlDZq8ZQyKwGUPfsBlDnLEZQ0iiGkMGoxpDxaMaQ4OkGkNCpRpDAKYaQ7+mGkN9pxpDPKgaQ/+oGkO9qRpDfKoaQzqrGkO0o0dDy6RHQ+OlR0P6pkdDEahHQympR0NAqkdDWKtHQ2+sR0OHrUdDnq5HQ7avR0PNsEdDaT1RQ5U+UUPAP1FD7EBRQxhCUUNEQ1FDcERRQ5xFUUPHRlFD9EdRQyBJUUNLSlFDd0tRQ3p0bEPidWxDS3dsQ7N4bEMbemxDg3tsQ+t8bENTfmxDvH9sQySBbEONgmxD9YNsQ12FbEPGhmxDDn6EQ+R+hEO5f4RDj4CEQ2WBhEM6goRDEIOEQ+aDhEO7hIRDkYWEQ2eGhEM8h4RDEoiEQ5x6hUN0e4VDTHyFQyR9hUP9fYVD1X6FQ61/hUOFgIVDXYGFQzWChUMNg4VD5YOFQ72EhUOVhYVDlnaGQ3B3hkNLeIZDJXmGQwB6hkPaeoZDtHuGQ498hkNpfYZDRH6GQx5/hkP5f4ZD04CGQ66BhkOIgoZDY4OGQz2EhkMM9oZD6PaGQ8T3hkOf+IZDe/mGQ1f6hkMy+4ZDDvyGQ+r8hkPF/YZDof6GQ33/hkNYAIdDNAGHQxACh0PrAodDG9CIQ/vQiEPb0YhDu9KIQ5vTiEN71IhDXNWIQzzWiEMc14hD/NeIQ9zYiEO82YhDnNqIQ33biENvQYxDV0KMQ0BDjEMpRIxDEUWMQ/pFjEPjRoxDy0eMQ7RIjEOdSYxDhkqMQ25LjENXTIxDT3+MQzmAjEMigYxDC4KMQ/WCjEPeg4xDx4SMQ7CFjEOahoxDg4eMQ2yIjENWiYxDP4qMQyiLjEMSjIxD+4yMQ+WNjEMhAI1DCwGNQ/YBjUPgAo1DywONQ7UEjUOgBY1DigaNQ3UHjUNgCI1DSgmNQzUKjUMfC41DCgyNQ/UMjUP0fY1D4H6NQ8x/jUO3gI1Do4GNQ4+CjUN7g41DZ4SNQ1KFjUM+ho1DKoeNQxaIjUMCiY1D7YmNQ9mKjUO6eY5DqXqOQ5d7jkOFfI5Dc32OQ2F+jkNQf45DPoCOQyyBjkMago5DCYOOQ/eDjkPlhI5D1IWOQ8KGjkOwh45Dn4iOQ3n6jkNo+45DWPyOQ0f9jkM3/o5DJv+OQxYAj0MFAY9D9QGPQ+QCj0PUA49DwwSPQ7IFj0OiBo9DkQePQ4EIj0P7f5VD+4CVQ/uBlUP7gpVD+4OVQ/uElUP7hZVD+4aVQ/uHlUP7iJVD/ImVQ/yKlUP8i5VD/IyVQ/yNlUP8jpVD/I+VQ4AtmkOMLppDmC+aQ6UwmkOxMZpDvTKaQ8kzmkPVNJpD4jWaQ+42mkP6N5pDBjmaQxM6mkMfO5pDbF3DQ+pew0NpYMND52HDQw=="
-        out_array = self.spec._decode_to_tuple(
-            b64_array, 343, "32-bit float", "no compression"
-        )
+        out_array = self.spec._decode_to_tuple(b64_array, 343, "32-bit float", "no compression")
         # self.assertEqual(out_array, test_array)
 
     def test_reprofile_peaks(self):
@@ -206,9 +188,7 @@ class SpectrumTest(unittest.TestCase):
         """ """
         h_peaks = self.spec.highest_peaks(3)
         high_i = [i for mz, i in h_peaks]
-        self.assertEqual(
-            sorted([i for mz, i in self.spec.peaks("centroided")])[-3:], high_i
-        )
+        self.assertEqual(sorted([i for mz, i in self.spec.peaks("centroided")])[-3:], high_i)
 
     def test_extreme_values(self):
         """ """

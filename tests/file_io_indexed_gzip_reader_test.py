@@ -3,8 +3,8 @@
 """
 Part of pymzml test cases
 """
-import os
-from pymzml.utils.GSGR import GSGR
+
+from pymzml.utils.gzip_reader import GzipReader
 import unittest
 import test_file_paths
 
@@ -14,7 +14,7 @@ class GSGRTest(unittest.TestCase):
 
     def setUp(self):
         paths = test_file_paths.paths
-        self.Reader = GSGR(paths[2])
+        self.Reader = GzipReader(paths[2])
 
     def test_init(self):
         """ """

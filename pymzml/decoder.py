@@ -1,128 +1,139 @@
 #!/usr/bin/env python3
 """
-Classes to encode and decode :py:attr:`~pymzml.spec.Spectrum.mz` and
+MS-Numpress decoder for :py:attr:`~pymzml.spec.Spectrum.mz` and
 :py:attr:`~pymzml.spec.Spectrum.i` values.
 
 @author M. Kösters, C. Fufezan
 """
-import warnings
-import zlib
-from base64 import b64decode as b64dec
-from multiprocessing import Pool
-from typing import Tuple, List, Union, Any, Callable
 
 import numpy as np
 from numpy.typing import NDArray
 
-# Global PyNump decoder
-try:
-    # try to import c-accelerated Numpress decoding
-    import pynumpress
 
-    MSDecoder = pynumpress
-except ImportError:
-    # fall back to python-only implementation of numpress decoding
-    import pymzml.ms_numpress
-
-    warnings.warn(
-        "Cython PyNumpress is not installed; falling back to slower, python-only version",
-        ImportWarning,
-    )
-    MSDecoder = pymzml.ms_numpress.MSNumpress()
-
-
-def _decode(
-    data: bytes,
-    comp: List[str],
-    d_array_length: Union[str, int],
-    f_type: str,
-    d_type: str
-) -> Tuple[str, Union[NDArray[np.float32], NDArray[np.float64], List[float]]]:
+class MSDecoder:
     """
-    Decode ms-numpress, b64 and/or zlib compressed data.
+    Lazy-loading decoder for MS-Numpress compressed data.
 
-    Args:
-        data (bytes): compressed data
-        comp (List[str]): compression method
-        d_array_length (Union[str, int]): length of the uncompressed data array
-        f_type (str): float type (32 or 64 bit)
-        d_type (str): type of data (mz, i, or time)
-
-    Returns:
-        result (Tuple[str, Union[NDArray, List]]): tuple containing the datatype and the
-        decompressed data array.
-    """
-    np_dtype: Union[type[np.float32], type[np.float64], None]
-    if f_type == "32-bit float":
-        np_dtype = np.float32
-    elif f_type == "64-bit float":
-        np_dtype = np.float64
-    else:
-        np_dtype = None
-
-    decoded_data = b64dec(data)
-    if "zlib" in comp or "zlib compression" in comp:
-        decoded_data = zlib.decompress(decoded_data)
-
-    if (
-        "ms-np-linear" in comp
-        or "ms-np-pic" in comp
-        or "ms-np-slof" in comp
-        or "MS-Numpress linear prediction compression" in comp
-        or "MS-Numpress short logged float compression" in comp
-    ):
-        result = []
-        # start ms numpress decoder globally?
-        if (
-            "ms-np-linear" in comp
-            or "MS-Numpress linear prediction compression" in comp
-        ):
-            result = MSDecoder.decodeLinear(decoded_data)
-        elif "ms-np-pic" in comp:
-            result = MSDecoder.decode_pic(decoded_data)
-        elif (
-            "ms-np-slof" in comp or "MS-Numpress short logged float compression" in comp
-        ):
-            result = MSDecoder.decode_slof(decoded_data)
-        return (d_type, result)
-
-    array = np.fromstring(decoded_data, np_dtype)  # type: ignore[arg-type]
-    return (d_type, array)
-
-
-class Decoder:
-    """
-    Decoder class to enable parallel decoding of peaks.
-
-    Keyword Args:
-        nb_worker(int): number of pool workers to use. Defaults to 2.
+    Attempts to use the compiled pynumpress library. Import happens on first use
+    to avoid import errors during module initialization.
     """
 
-    def __init__(self, nb_workers: int = 2) -> None:
-        """ """
-        self._mz: Union[None, NDArray[Any], List[float]] = None
-        self._i: Union[None, NDArray[Any], List[float]] = None
+    _pynumpress = None
+    _import_attempted = False
 
-    # @profile
-    def pool_decode(self, data: Any, callback: Callable[..., Any]) -> None:
+    @classmethod
+    def _get_decoder(cls):
+        """Get the pynumpress decoder, importing it if necessary."""
+        if not cls._import_attempted:
+            cls._import_attempted = True
+            try:
+                import pynumpress  # type: ignore
+
+                cls._pynumpress = pynumpress
+            except ImportError as e:
+                raise ImportError(
+                    "pynumpress is required for numpress-compressed mzML files.\n"
+                    "Install it with: pip install pynumpress\n"
+                    f"Original error: {e}"
+                ) from e
+
+        if cls._pynumpress is None:
+            raise ImportError(
+                "pynumpress is required for numpress-compressed mzML files.\n"
+                "Install it with: pip install pynumpress"
+            )
+
+        return cls._pynumpress
+
+    @classmethod
+    def decode_linear(cls, data: NDArray[np.uint8] | bytes) -> NDArray[np.float64]:
         """
-        Decode mz and i values in parallel.
+        Decode MS-Numpress linear prediction compressed data.
 
         Args:
-            data: ...
+            data: Compressed data as bytes or numpy array
 
-        Keyword Args:
-            callback (Callable): Callback function to call if decoding is
-                finished. Should be :py:meth:`~pymzml.spec.Spectrum._register`.
+        Returns:
+            Decoded data as numpy array
         """
-        ZE_POOL = Pool(processes=2)
+        decoder = cls._get_decoder()
+        result = decoder.decodeLinear(data)  # type: ignore
+        return np.asarray(result, dtype=np.float64)
 
-        ZE_POOL.starmap(_decode, data)
+    @classmethod
+    def decode_pic(cls, data: NDArray[np.uint8] | bytes) -> NDArray[np.float64]:
+        """
+        Decode MS-Numpress positive integer compressed data.
 
-    def _error_callback(self, result: Any) -> None:
-        """ """
-        raise Exception("Failed with error:\n{0}".format(result))
+        Args:
+            data: Compressed data as bytes or numpy array
 
+        Returns:
+            Decoded data as numpy array
+        """
+        decoder = cls._get_decoder()
+        result = decoder.decodePic(data)  # type: ignore
+        return np.asarray(result, dtype=np.float64)
 
-if __name__ == "__main__":
-    print(__doc__)
+    @classmethod
+    def decode_slof(cls, data: NDArray[np.uint8] | bytes) -> NDArray[np.float64]:
+        """
+        Decode MS-Numpress short logged float compressed data.
+
+        Args:
+            data: Compressed data as bytes or numpy array
+
+        Returns:
+            Decoded data as numpy array
+        """
+        decoder = cls._get_decoder()
+        result = decoder.decodeSlof(data)  # type: ignore
+        return np.asarray(result, dtype=np.float64)
+
+    @classmethod
+    def encode_linear(cls, data: NDArray[np.float64] | list[float]) -> bytearray:
+        """
+        Encode data using MS-Numpress linear prediction compression.
+
+        Args:
+            data: Data to compress as numpy array or list
+
+        Returns:
+            Compressed data as bytearray
+        """
+        decoder = cls._get_decoder()
+        if isinstance(data, list):
+            data = np.array(data, dtype=np.float64)
+        return decoder.encodeLinear(data)  # type: ignore
+
+    @classmethod
+    def encode_pic(cls, data: NDArray[np.float64] | list[float]) -> bytearray:
+        """
+        Encode data using MS-Numpress positive integer compression.
+
+        Args:
+            data: Data to compress as numpy array or list
+
+        Returns:
+            Compressed data as bytearray
+        """
+        decoder = cls._get_decoder()
+        if isinstance(data, list):
+            data = np.array(data, dtype=np.float64)
+        return decoder.encodePic(data)  # type: ignore
+
+    @classmethod
+    def encode_slof(cls, data: NDArray[np.float64] | list[float]) -> bytearray:
+        """
+        Encode data using MS-Numpress short logged float compression.
+
+        Args:
+            data: Data to compress as numpy array or list
+
+        Returns:
+            Compressed data as bytearray
+        """
+        decoder = cls._get_decoder()
+        if isinstance(data, list):
+            data = np.array(data, dtype=np.float64)
+        return decoder.encodeSlof(data)  # type: ignore

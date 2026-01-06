@@ -1,44 +1,23 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Interface for indexed gzipped files
 
 @author: Manuel Koesters
 """
 
-# Python mzML module - pymzml
-# Copyright (C) 2010-2019 M. Kösters, C. Fufezan
-#     The MIT License (MIT)
-
-#     Permission is hereby granted, free of charge, to any person obtaining a copy
-#     of this software and associated documentation files (the "Software"), to deal
-#     in the Software without restriction, including without limitation the rights
-#     to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#     copies of the Software, and to permit persons to whom the Software is
-#     furnished to do so, subject to the following conditions:
-
-#     The above copyright notice and this permission notice shall be included in all
-#     copies or substantial portions of the Software.
-
-#     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#     IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#     FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#     AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-#     SOFTWARE.
+from collections import OrderedDict
 
 import codecs
 import gzip
 from xml.etree.ElementTree import XML
+from typing import Union
 
 from .. import spec
 from .. import chromatogram
-from ..utils.GSGR import GSGR
+from ..utils.gzip_reader import GzipReader
 
 
 class IndexedGzip:
-    def __init__(self, path, encoding):
+    def __init__(self, path: str, encoding: str) -> None:
         """
         Initialize Wrapper object for indexed gzipped files.
 
@@ -46,22 +25,22 @@ class IndexedGzip:
             path (str)     : path to the file
             encoding (str) : encoding of the file
         """
-        self.path = path
+        self.path: str = path
         self.file_handler = codecs.getreader(encoding)(gzip.open(path))
-        self.offset_dict = dict()
+        self.offset_dict: OrderedDict[int | str, int] = OrderedDict()
         self._build_index()
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Close handlers when deleting object."""
         self.Reader.close()
         self.file_handler.close()
 
-    def _build_index(self):
+    def _build_index(self) -> None:
         """Use the GSGR class to retrieve the index from the file and save it."""
-        self.Reader = GSGR(self.path)
-        self.offset_dict = self.Reader.index
+        self.Reader: GzipReader = GzipReader(self.path)
+        self.offset_dict: OrderedDict[int | str, int] = self.Reader.index
 
-    def read(self, size=-1):
+    def read(self, size: int = -1) -> str:
         """
         Read binary data from file handler.
 
@@ -73,7 +52,9 @@ class IndexedGzip:
         """
         return self.file_handler.read(size)
 
-    def __getitem__(self, identifier):
+    def __getitem__(
+        self, identifier: Union[int, str]
+    ) -> Union[spec.Spectrum, chromatogram.Chromatogram]:
         """
         Access the item with id 'identifier' in the file.
 
@@ -94,7 +75,7 @@ class IndexedGzip:
         else:
             return spec.Spectrum(list(element)[0], measured_precision=5e-6)
 
-    def close(self):
+    def close(self) -> None:
         """Close the handlers."""
         self.Reader.close()
         self.file_handler.close()

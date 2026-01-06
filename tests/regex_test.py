@@ -4,8 +4,6 @@
 Part of pymzml test cases
 """
 
-import sys
-import os
 import pymzml.regex_patterns as rp
 import unittest
 from collections import OrderedDict as odict
@@ -14,14 +12,11 @@ import re
 
 class RegexTest(unittest.TestCase):
     def setUp(self):
-
+        spec_OBO_1_1_0 = b'<spectrum id="spectrum=1019" index="8" defaultArrayLength="431">'
         spec_OBO_1_1_0 = (
-            b'<spectrum id="spectrum=1019" index="8" defaultArrayLength="431">'
+            b'<spectrum id="scan=3" index="0" sourceFileRef="SF1" defaultArrayLength="92">'
         )
-        spec_OBO_1_1_0 = b'<spectrum id="scan=3" index="0" sourceFileRef="SF1" defaultArrayLength="92">'
-        spec_OBO_1_0_0 = (
-            b'<spectrum index="317" id="S318" nativeID="318" defaultArrayLength="34">'
-        )
+        spec_OBO_1_0_0 = b'<spectrum index="317" id="S318" nativeID="318" defaultArrayLength="34">'
         spec_OBO_0_99_1 = b'<spectrum id="S20" scanNumber="20" msLevel="2">'
 
         chro_OBO_1_1_0 = ""

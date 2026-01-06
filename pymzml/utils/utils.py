@@ -1,33 +1,10 @@
-#!/usr/bin/env python
 """
 Additional functions for converting file etc.
 
 @author M. Kösters
 """
 
-# Python mzML module - pymzml
-# Copyright (C) 2010-2019 M. Kösters, C. Fufezan
-#     The MIT License (MIT)
-
-#     Permission is hereby granted, free of charge, to any person obtaining a copy
-#     of this software and associated documentation files (the "Software"), to deal
-#     in the Software without restriction, including without limitation the rights
-#     to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#     copies of the Software, and to permit persons to whom the Software is
-#     furnished to do so, subject to the following conditions:
-
-#     The above copyright notice and this permission notice shall be included in all
-#     copies or substantial portions of the Software.
-
-#     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#     IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#     FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#     AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-#     SOFTWARE.
-
-from pymzml.utils.GSGW import GSGW
+from pymzml.utils.gzip_writer import GzipWriter
 import pymzml.regex_patterns as regex_patterns
 import re
 import gzip
@@ -63,8 +40,8 @@ def index_gzip(
         fileOpen = open
     else:
         raise ValueError(f"Unsupported file format for {pathIn}")
-        
-    with GSGW(
+
+    with GzipWriter(
         output_path=pathOut,
         max_idx=max_idx,
         max_idx_len=idx_len,
@@ -76,7 +53,7 @@ def index_gzip(
             nativeID: Union[int, str] = "unknown"
             for line in Reader:
                 line_stripped = line.strip()
-                
+
                 if line_stripped.startswith("<spectrum "):
                     data += line
                     match = re.search(regex_patterns.SPECTRUM_TAG_PATTERN, line)
@@ -85,7 +62,7 @@ def index_gzip(
                         id_match = regex_patterns.SPECTRUM_ID_PATTERN.search(lineID)
                         if id_match:
                             nativeID = int(id_match.group(1))
-                            
+
                 elif line_stripped.startswith("</spectrum>"):
                     data += line
                     Writer.add_data(data, nativeID)
@@ -93,7 +70,7 @@ def index_gzip(
                         print(f"NativeID : {nativeID}", end="\r")
                     data = ""
                     nativeID = "unknown"
-                    
+
                 elif line_stripped.startswith("<chromatogram "):
                     data += line
                     match = re.search(regex_patterns.CHROMATOGRAM_ID_PATTERN, line)
@@ -101,7 +78,7 @@ def index_gzip(
                         nativeID = match.group(1)
                         if verbose:
                             print("found chromatogram")
-                            
+
                 elif line_stripped.startswith("</chromatogram>"):
                     data += line
                     Writer.add_data(data, nativeID)
@@ -110,24 +87,24 @@ def index_gzip(
                         print(f"NativeID: {nativeID}")
                     data = ""
                     nativeID = "unknown"
-                    
+
                 elif line_stripped.startswith("<spectrumL"):
                     data += line
                     Writer.add_data(data, "Head")
                     if verbose:
                         print("NativeID :", "Head")
                     data = ""
-                    
+
                 elif line_stripped.startswith("<chromatogramL"):
                     data += line
                     Writer.add_data(data, "junk")
                     if verbose:
                         print("NativeID :", "junk")
                     data = ""
-                    
+
                 else:
                     data += line
-                    
+
             if data:
                 Writer.add_data(data, "tail")
                 if verbose:
@@ -157,7 +134,7 @@ def index(
         comp_str(int): compression strength of zlib compression,
             needs to  be 1 <= x <= 9
     """
-    with GSGW(
+    with GzipWriter(
         output_path=pathOut,
         max_idx=max_idx,
         max_idx_len=idx_len,
@@ -169,7 +146,7 @@ def index(
             nativeID: Union[int, str] = "unknown"
             for line in Reader:
                 line_stripped = line.strip()
-                
+
                 if line_stripped.startswith("<spectrum "):
                     data += line
                     match = re.search(regex_patterns.SPECTRUM_TAG_PATTERN, line)
@@ -178,19 +155,19 @@ def index(
                         id_match = regex_patterns.SPECTRUM_ID_PATTERN.search(lineID)
                         if id_match:
                             nativeID = int(id_match.group(0))
-                            
+
                 elif line_stripped.startswith("</spectrum>"):
                     data += line
                     Writer.add_data(data, nativeID)
                     data = ""
                     nativeID = "unknown"
-                    
+
                 elif line_stripped.startswith("<chromatogram "):
                     data += line
                     match = re.search(regex_patterns.CHROMATOGRAM_ID_PATTERN, line)
                     if match:
                         nativeID = match.group(1)
-                        
+
                 elif line_stripped.startswith("</chromatogram>"):
                     data += line
                     Writer.add_data(data, nativeID)
@@ -199,24 +176,24 @@ def index(
                         print(f"NativeID : {nativeID}", end="\r")
                     data = ""
                     nativeID = "unknown"
-                    
+
                 elif line_stripped.startswith("<spectrumL"):
                     data += line
                     Writer.add_data(data, "Head")
                     if verbose:
                         print("NativeID :", "Head")
                     data = ""
-                    
+
                 elif line_stripped.startswith("<chromatogramL"):
                     data += line
                     Writer.add_data(data, "junk")
                     if verbose:
                         print("NativeID :", "junk")
                     data = ""
-                    
+
                 else:
                     data += line
-                    
+
             if data:
                 Writer.add_data(data, "tail")
                 if verbose:
@@ -227,11 +204,11 @@ def index(
 def make_obo_mapping(obo: str, reversed: bool = False) -> Dict[str, str]:
     """
     Create a mapping dictionary from an OBO file.
-    
+
     Arguments:
         obo (str): path to OBO file
         reversed (bool): if True, reverse the mapping (name -> id instead of id -> name)
-    
+
     Returns:
         Dict[str, str]: mapping dictionary
     """

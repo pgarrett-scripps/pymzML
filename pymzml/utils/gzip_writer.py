@@ -1,40 +1,16 @@
-#!/usr/bin/env python
-# -*- coding: latin-1 -*-
 """
 Writer class for indexed gzipped files
 """
-
-# Python mzML module - pymzml
-# Copyright (C) 2010-2019 M. Kösters, C. Fufezan
-#     The MIT License (MIT)
-
-#     Permission is hereby granted, free of charge, to any person obtaining a copy
-#     of this software and associated documentation files (the "Software"), to deal
-#     in the Software without restriction, including without limitation the rights
-#     to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#     copies of the Software, and to permit persons to whom the Software is
-#     furnished to do so, subject to the following conditions:
-
-#     The above copyright notice and this permission notice shall be included in all
-#     copies or substantial portions of the Software.
-
-#     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#     IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#     FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#     AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-#     SOFTWARE.
 
 import struct
 import time
 import zlib
 from collections import OrderedDict
-from typing import Optional, Union, BinaryIO, List
+from typing import BinaryIO
 from types import TracebackType
 
 
-class GSGW:
+class GzipWriter:
     """
 
     Generalized Gzip writer class with random access to indexed offsets.
@@ -52,13 +28,14 @@ class GSGW:
 
     def __init__(
         self,
-        file: Optional[str] = None,
+        file: str | None = None,
         max_idx: int = 10000,
         max_idx_len: int = 8,
         max_offset_len: int = 8,
         output_path: str = "./test.dat.igzip",
         comp_str: int = -1,
     ) -> None:
+        self.file: str | None = file
         self.Lock: bool = False
         self._format_version: int = 1  # max 255!!!
         self.file_name: str = output_path
@@ -76,9 +53,9 @@ class GSGW:
                 ("OS", b"\x03"),
             ]
         )
-        self.index: OrderedDict[Union[int, str], int] = OrderedDict()
+        self.index: OrderedDict[int | str, int] = OrderedDict()
         self.first_header_set: bool = False
-        self._file_out: Optional[BinaryIO] = None
+        self._file_out: BinaryIO | None = None
         self._encoding: str = "latin-1"
         # magic bytes. FU+version
         self.index_magic_bytes: bytes = b"FU" + struct.pack("<B", self._format_version)
@@ -128,7 +105,7 @@ class GSGW:
         assert isinstance(encoding, str), "encoding must be a string"
         self._encoding = encoding
 
-    def _write_gen_header(self, Index: bool = False, FLAGS: Optional[List[str]] = None) -> int:
+    def _write_gen_header(self, index: bool = False, flags: list[str] | None = None) -> int:
         """
         Write a valid gzip header with creation time, user defined flag fields
         and allocated index.
@@ -142,44 +119,44 @@ class GSGW:
         Returns:
             offset (int): byte offset of the file pointer
         """
-        flags: List[str] = []
-        if FLAGS is None:
-            flags = []
+        _flags: list[str] = []
+        if flags is None:
+            _flags = []
         else:
-            flags = FLAGS
+            _flags = flags
         FTEXT, FHCRC, FEXTRA, FNAME = 1, 2, 4, 8  # extra field bit flags
         current_time = int(time.time())
         time_byte = struct.pack("<L", current_time)
         self.generic_header["DATE"] = time_byte
-        if Index:
+        if index:
             self.generic_header["FLAGS"] = b"\x10"
-        if flags:
-            if "FTEXT" in flags:
+        if _flags:
+            if "FTEXT" in _flags:
                 self.generic_header["FLAGS"] = bytes([self.generic_header["FLAGS"][0] | FTEXT])
 
-            if "FHCRC" in flags:
+            if "FHCRC" in _flags:
                 header_crc32 = 0
                 self.generic_header["FLAGS"] = bytes([self.generic_header["FLAGS"][0] | FHCRC])
                 for byte in self.generic_header.values():
                     header_crc32 = zlib.crc32(byte, header_crc32)
 
-            if "FEXTRA" in flags:
+            if "FEXTRA" in _flags:
                 self.generic_header["FLAGS"] = bytes([self.generic_header["FLAGS"][0] | FEXTRA])
 
-            if "FNAME" in flags:
+            if "FNAME" in _flags:
                 self.generic_header["FLAGS"] = bytes([self.generic_header["FLAGS"][0] | FNAME])
 
         for value in self.generic_header.values():
             self.file_out.write(value)
-        if "FEXTRA" in flags:
+        if "FEXTRA" in _flags:
             # WRITE EXTRA FIELD
             pass
 
-        if "FNAME" in flags:
+        if "FNAME" in _flags:
             # WRITE FNAME FIELD
             _ = self.file_name.split("/")[-1]
 
-        if Index:
+        if index:
             self.generic_header["FLAGS"] = b"\x00"
             self.file_out.write(self.index_magic_bytes)
             self.file_out.write(struct.pack("<B", self.max_idx_len))
@@ -187,7 +164,7 @@ class GSGW:
             self.index_offset = self.file_out.tell()
             self._allocate_index_bytes()
 
-        if "FHCRC" in flags:
+        if "FHCRC" in _flags:
             # WRITE checksum for header
             pass
 
@@ -205,7 +182,7 @@ class GSGW:
             self.file_out.write(offset_placeholder)
         self.file_out.write(b"\x00")
 
-    def _write_data(self, data: Union[str, bytes, bytearray, memoryview]) -> None:
+    def _write_data(self, data: str | bytes | bytearray | memoryview) -> None:
         """
         Write data into file-stream.
 
@@ -222,7 +199,7 @@ class GSGW:
             data = data.tobytes()
         elif isinstance(data, bytearray):
             data = bytes(data)
-        elif not isinstance(data, bytes): # type: ignore
+        elif not isinstance(data, bytes):  # type: ignore
             # fallback: convert to str then encode with configured encoding
             data = str(data).encode(self._encoding)
         self.crc32 = zlib.crc32(data)
@@ -232,7 +209,7 @@ class GSGW:
         self.file_out.write(struct.pack("<L", self.crc32))
         self.file_out.write(struct.pack("<L", self.isize))
 
-    def add_data(self, data: Union[str, bytes], identifier: Union[int, str]) -> Optional[bool]:
+    def add_data(self, data: str | bytes, identifier: int | str) -> bool | None:
         """
         Create a new gzip member with compressed 'data' indexed with 'index'.
 
@@ -242,30 +219,28 @@ class GSGW:
         """
         if self.Lock:
             raise Exception("Cant add any more data if index is already written")
-            
+
         if len(self.index) + 1 > self.max_idx_num:
             print(
                 """
                 WARNING: Reached maximum number of indexed data blocks
                 '({0}), cannot add any more data!
-                """.format(
-                    self.max_idx_num
-                )
+                """.format(self.max_idx_num)
             )
             return False
 
         if not self.first_header_set:
-            self._write_gen_header(Index=True)
+            self._write_gen_header(index=True)
             self.first_header_set = True
         else:
             # do we need this?
-            self._write_gen_header(Index=False)
+            self._write_gen_header(index=False)
 
         self.index[identifier] = self.file_out.tell()
         self._write_data(data)
         return None
 
-    def _write_identifier(self, identifier: Union[int, str]) -> None:
+    def _write_identifier(self, identifier: int | str) -> None:
         """
         Convert and write the identifier into output file.
 
@@ -304,7 +279,7 @@ class GSGW:
             self._write_identifier(identifier)
             self._write_offset(offset)
 
-    def __enter__(self) -> "GSGW":
+    def __enter__(self) -> "GzipWriter":
         """
         Enable the with syntax for this class (entry point).
         """
@@ -312,9 +287,9 @@ class GSGW:
 
     def __exit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_value: Optional[BaseException],
-        traceback: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
     ) -> None:
         """Destructor when using this class with 'with .. as'."""
         if self._file_out is not None:

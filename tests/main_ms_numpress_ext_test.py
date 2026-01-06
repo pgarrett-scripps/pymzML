@@ -7,10 +7,15 @@ try:
 except:
     np = None
 
-import pynumpress
+try:
+    import pynumpress
+except:
+    pynumpress = None
 
 
-@unittest.skipIf(np is None, "Numpy is required for this test.")
+@unittest.skipIf(
+    np is None or pynumpress is None, "Numpy and pynumpress are required for this test."
+)
 class test_MSNumpress(unittest.TestCase):
     """
     unittest for MSNumpress en- and decoding
@@ -28,9 +33,7 @@ class test_MSNumpress(unittest.TestCase):
 
     def test_encode_slof(self):
         fp = pynumpress.optimal_slof_fixed_point(self.i_slof_data)
-        encoded_array = pynumpress.encode_slof(
-            np.asarray(self.i_slof_data, dtype=np.float64), fp
-        )
+        encoded_array = pynumpress.encode_slof(np.asarray(self.i_slof_data, dtype=np.float64), fp)
 
         self.assertEqual(len(encoded_array), 14)
 
@@ -78,9 +81,7 @@ class test_MSNumpress(unittest.TestCase):
         # pynumpress.decoded_data = self.i_slof_data
         print(self.i_slof_data)
         fp = pynumpress.optimal_slof_fixed_point(self.i_slof_data)
-        encoded_array = pynumpress.encode_slof(
-            np.asarray(self.i_slof_data, dtype=np.float64), fp
-        )
+        encoded_array = pynumpress.encode_slof(np.asarray(self.i_slof_data, dtype=np.float64), fp)
         decoded_array = pynumpress.decode_slof(encoded_array)
         for i, dec in enumerate(decoded_array):
             self.assertAlmostEqual(dec, self.i_slof_data[i], places=2)
@@ -88,9 +89,7 @@ class test_MSNumpress(unittest.TestCase):
     def test_encode_pic_i_data(self):
         encoded_array = pynumpress.encode_pic(np.asarray(self.i_data, dtype=np.float64))
 
-        self.assertEqual(
-            len(encoded_array), 14, msg="{}".format([hex(x) for x in encoded_array])
-        )
+        self.assertEqual(len(encoded_array), 14, msg="{}".format([hex(x) for x in encoded_array]))
 
         self.assertEqual(encoded_array[0], 0x20)
         self.assertEqual(encoded_array[1], 0x4B)
@@ -133,9 +132,7 @@ class test_MSNumpress(unittest.TestCase):
 
     def test_encode_decode_pic(self):
         """ """
-        encoded_array = pynumpress.encode_pic(
-            np.asarray(self.i_slof_data, dtype=np.float64)
-        )
+        encoded_array = pynumpress.encode_pic(np.asarray(self.i_slof_data, dtype=np.float64))
         decoded_array = pynumpress.decode_pic(encoded_array)
         self.assertCountEqual(self.i_slof_data, decoded_array)
 
@@ -293,7 +290,6 @@ class test_MSNumpress(unittest.TestCase):
         # )
 
     def test_decode_linear(self):
-
         # ouput of  >>> PyMSNumpress.encode_linear(self.mz_data, enc,
         # self.fixed_point)
         encoded_array = [

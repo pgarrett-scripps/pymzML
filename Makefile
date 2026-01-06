@@ -28,47 +28,48 @@ help:
 	@echo "  make lint             - Run linters (if configured)"
 	@echo "  make format           - Format code (if configured)"
 	@echo "  make check            - Run all checks"
+	@echo "  make ty               - Run type checking with ty"
 
 # Installation
 install:
-	uv sync --no-dev
+	uv sync --no-dev --python-preference managed
 
 install-dev:
-	uv sync --all-extras
+	uv sync --all-extras --python-preference managed
 
 sync:
-	uv sync --all-extras
+	uv sync --all-extras --python-preference managed
 
 # Testing
 test:
-	uv run pytest
+	uv run --python-preference managed pytest
 
 test-verbose:
-	uv run pytest -v
+	uv run --python-preference managed pytest -v
 
 coverage:
-	uv run coverage erase
-	uv run coverage run -m pytest
-	uv run coverage report --omit=".venv/*","tests/*"
-	uv run coverage html
+	uv run --python-preference managed coverage erase
+	uv run --python-preference managed coverage run -m pytest
+	uv run --python-preference managed coverage report --omit=".venv/*","tests/*"
+	uv run --python-preference managed coverage html
 	@echo "Coverage report generated in htmlcov/index.html"
 
 example-scripts:
-	uv run python example_scripts/access_run_info.py
-	uv run python example_scripts/access_spectra_and_chromatograms.py
-	uv run python example_scripts/compare_spectra.py
-	uv run python example_scripts/extract_ion_chromatogram.py
-	uv run python example_scripts/extreme_values.py
-	uv run python example_scripts/get_precursors.py
-	uv run python example_scripts/has_peak.py
-	uv run python example_scripts/highest_peaks.py
+	uv run --python-preference managed python example_scripts/access_run_info.py
+	uv run --python-preference managed python example_scripts/access_spectra_and_chromatograms.py
+	uv run --python-preference managed python example_scripts/compare_spectra.py
+	uv run --python-preference managed python example_scripts/extract_ion_chromatogram.py
+	uv run --python-preference managed python example_scripts/extreme_values.py
+	uv run --python-preference managed python example_scripts/get_precursors.py
+	uv run --python-preference managed python example_scripts/has_peak.py
+	uv run --python-preference managed python example_scripts/highest_peaks.py
 
 # Benchmarking
 benchmark:
-	uv run python benchmark_centroiding.py
+	uv run --python-preference managed python benchmark_centroiding.py
 
 test-large:
-	uv run python test_centroiding_performance.py
+	uv run --python-preference managed python test_centroiding_performance.py
 
 # Documentation
 docs:
@@ -100,9 +101,10 @@ lint:
 	# uv run ruff check pymzml tests
 
 format:
-	@echo "Add your formatting commands here (e.g., black, ruff format)"
-	# uv run ruff format pymzml tests
-	# uv run black pymzml tests
+	uv run ruff format pymzml tests
 
 check: lint test
 	@echo "All checks passed!"
+
+ty: 
+	uv run --python-preference managed ty check pymzml

@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-# encoding: utf-8
 """
 The class :py:class:`Reader` has been designed to selectively extract data
 from a mzML file and to expose the data as a python object.
@@ -14,29 +12,6 @@ Note:
     The class :py:class:`Writer` is still in development.
 
 """
-
-# Python mzML module - pymzml
-# Copyright (C) 2010-2019 M. Kösters, C. Fufezan
-#     The MIT License (MIT)
-
-#     Permission is hereby granted, free of charge, to any person obtaining a copy
-#     of this software and associated documentation files (the "Software"), to deal
-#     in the Software without restriction, including without limitation the rights
-#     to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#     copies of the Software, and to permit persons to whom the Software is
-#     furnished to do so, subject to the following conditions:
-
-#     The above copyright notice and this permission notice shall be included in all
-#     copies or substantial portions of the Software.
-
-#     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#     IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#     FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#     AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-#     SOFTWARE.
-
 
 import re
 import os
@@ -184,7 +159,9 @@ class Reader(object):
                 self.iter = self._init_iter()
                 raise StopIteration
 
-    def __getitem__(self, identifier: Union[str, int]) -> Union[spec.Spectrum, chromatogram.Chromatogram]:
+    def __getitem__(
+        self, identifier: Union[str, int]
+    ) -> Union[spec.Spectrum, chromatogram.Chromatogram]:
         """
         Access spectrum or chromatogram with native id 'identifier'.
 
@@ -202,7 +179,9 @@ class Reader(object):
         except:
             pass
 
-        element: Union[spec.Spectrum, chromatogram.Chromatogram] = self.info["file_object"][identifier]
+        element: Union[spec.Spectrum, chromatogram.Chromatogram] = self.info["file_object"][
+            identifier
+        ]
         element.obo_translator = self.OT
 
         if isinstance(element, spec.Spectrum):
@@ -210,7 +189,7 @@ class Reader(object):
 
         return element
 
-    def __enter__(self) -> 'Reader':
+    def __enter__(self) -> "Reader":
         return self
 
     def __exit__(self, type: Any, value: Any, traceback: Any) -> None:
@@ -221,7 +200,9 @@ class Reader(object):
         """Return file object in use."""
         return type(self.info["file_object"].file_handler)
 
-    def _open_file(self, path_or_file: Union[str, IO], build_index_from_scratch: bool = False) -> FileInterface:
+    def _open_file(
+        self, path_or_file: Union[str, IO], build_index_from_scratch: bool = False
+    ) -> FileInterface:
         """
         Open the path using the FileInterface class as a wrapper.
 
@@ -249,7 +230,9 @@ class Reader(object):
         Returns:
             mzml_encoding (str): encoding type of the file
         """
-        match: Optional[re.Match] = regex_patterns.FILE_ENCODING_PATTERN.search(mzml_file.readline())
+        match: Optional[re.Match] = regex_patterns.FILE_ENCODING_PATTERN.search(
+            mzml_file.readline()
+        )
         if match:
             return bytes.decode(match.group("encoding"))
         else:
@@ -351,7 +334,9 @@ class Reader(object):
         # required) ...
         if self.info.get("obo_version", None) is None:
             self.info["obo_version"] = "4.1.79"
-        obo_translator: obo.OboTranslator = obo.OboTranslator.from_cache(version=self.info["obo_version"])
+        obo_translator: obo.OboTranslator = obo.OboTranslator.from_cache(
+            version=self.info["obo_version"]
+        )
 
         return obo_translator
 
@@ -377,16 +362,11 @@ class Reader(object):
                     self.info["mzml_version"] = element.attrib["version"]
                 else:
                     s: str = element.attrib[
-                        "{http://www.w3.org/2001/XMLSchema-instance}" "schemaLocation"
+                        "{http://www.w3.org/2001/XMLSchema-instance}schemaLocation"
                     ]
-                    self.info["mzml_version"] = re.search(
-                        r"[0-9]*\.[0-9]*\.[0-9]*", s
-                    ).group()
+                    self.info["mzml_version"] = re.search(r"[0-9]*\.[0-9]*\.[0-9]*", s).group()
             elif element.tag.endswith("}cv"):
-                if (
-                    not self.info["obo_version"]
-                    and element.attrib.get("id", None) == "MS"
-                ):
+                if not self.info["obo_version"] and element.attrib.get("id", None) == "MS":
                     obo_in_mzml: str = element.attrib.get("version", "1.1.0")
                     self.info["obo_version"] = self._obo_version_validator(obo_in_mzml)
 
@@ -434,7 +414,7 @@ class Reader(object):
         self.root.clear()
         return mzml_iter
 
-    def __iter__(self) -> 'Reader':
+    def __iter__(self) -> "Reader":
         """Return self."""
         return self
 
@@ -502,7 +482,7 @@ class Reader(object):
 
             if identifier >= self.get_chromatogram_count():
                 raise Exception(
-                    f"Chromatogram index {identifier} is out of range (0-{self.get_chromatogram_count()-1})"
+                    f"Chromatogram index {identifier} is out of range (0-{self.get_chromatogram_count() - 1})"
                 )
 
             # Reset the file pointer and iterate to find the chromatogram

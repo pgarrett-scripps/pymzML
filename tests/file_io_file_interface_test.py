@@ -3,6 +3,7 @@
 """
 Part of pymzml test cases
 """
+
 import os
 from pymzml.file_interface import FileInterface
 from pymzml.file_classes.standardGzip import StandardGzip

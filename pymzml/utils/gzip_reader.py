@@ -1,39 +1,15 @@
-#!/usr/bin/env python
-# -*- coding: latin-1 -*-
 """
 Reader class for indexed gzipped files
 """
 
-# Python mzML module - pymzml
-# Copyright (C) 2010-2019 M. Kösters, C. Fufezan
-#     The MIT License (MIT)
-
-#     Permission is hereby granted, free of charge, to any person obtaining a copy
-#     of this software and associated documentation files (the "Software"), to deal
-#     in the Software without restriction, including without limitation the rights
-#     to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#     copies of the Software, and to permit persons to whom the Software is
-#     furnished to do so, subject to the following conditions:
-
-#     The above copyright notice and this permission notice shall be included in all
-#     copies or substantial portions of the Software.
-
-#     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#     IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#     FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#     AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-#     SOFTWARE.
-
 import struct
 import zlib
 from collections import OrderedDict
-from typing import Union, Optional, BinaryIO
+from typing import BinaryIO
 from types import TracebackType
 
 
-class GSGR:
+class GzipReader:
     """
     Generalized Gzip reader class which enables random access in files
     written with the :class:`~pymzml.utils.GSGW.GSGW` class.
@@ -49,8 +25,8 @@ class GSGR:
         self.indexed: bool = True
         self.random_access: bool = False
         self.ascii_file: bool = False
-        self.fname: Optional[bytes] = None
-        self.index: OrderedDict[Union[int, str], int] = OrderedDict()
+        self.fname: bytes | None = None
+        self.index: OrderedDict[int | str, int] = OrderedDict()
         self.cm: int = 0
         self.flg: int = 0
         self.mtime: int = 0
@@ -95,7 +71,7 @@ class GSGR:
         """
         self.file_in.seek(offset)
 
-    def read_block(self, index: Union[int, str]) -> bytes:
+    def read_block(self, index: int | str) -> bytes:
         """
         Read and return the data block with the unique index `index`
 
@@ -105,7 +81,7 @@ class GSGR:
         Returns:
             data (str): indexed text block as string
         """
-        start = self.index[index]
+        start: int = self.index[index]
         try:
             end = self.index[int(index) + 1]
         except (KeyError, ValueError, TypeError):
@@ -157,7 +133,7 @@ class GSGR:
             print("No index in comment field found. No random access possible")
             self.indexed = False
             return
-        
+
         lengths = struct.unpack("<BB", self.file_in.read(2))
         self.idx_len = lengths[0]
         self.offset_len = lengths[1]
@@ -167,7 +143,7 @@ class GSGR:
             OffsetBlock = self.file_in.read(self.offset_len)
             try:
                 try:
-                    Identifier: Union[int, str] = int(ID_block.decode("latin-1").strip("¬"))
+                    Identifier: int | str = int(ID_block.decode("latin-1").strip("¬"))
                 except (ValueError, UnicodeDecodeError):
                     Identifier = ID_block.decode("latin-1").strip("¬")
                 Offset = int(OffsetBlock.decode("latin-1").strip("¬"))
@@ -188,7 +164,7 @@ class GSGR:
         """
         return self.file_in.read(size)
 
-    def __enter__(self) -> "GSGR":
+    def __enter__(self) -> "GzipReader":
         """
         Enable the with syntax for this class (entry point)
         """
@@ -196,9 +172,9 @@ class GSGR:
 
     def __exit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_value: Optional[BaseException],
-        traceback: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
     ) -> None:
         """
         destructor when using this class with 'with .. as '

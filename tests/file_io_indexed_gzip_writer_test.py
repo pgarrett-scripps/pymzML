@@ -3,8 +3,9 @@
 """
 Part of pymzml test cases
 """
+
 import os
-from pymzml.utils.GSGW import GSGW
+from pymzml.utils.gzip_writer import GzipWriter
 import unittest
 import zlib
 import struct
@@ -17,29 +18,23 @@ class GSGWTest(unittest.TestCase):
 
     def setUp(self):
         self.paths = [os.path.join(os.path.dirname(__file__), "data", "unittest.mzml")]
-        self.Writer = GSGW(
+        self.Writer = GzipWriter(
             self.paths[0],
             max_idx=80,
             max_idx_len=8,
             max_offset_len=8,
-            output_path=os.path.abspath(
-                os.path.join(".", "tests", "data", "unittest.mzml")
-            ),
+            output_path=os.path.abspath(os.path.join(".", "tests", "data", "unittest.mzml")),
         )
 
     def tearDown(self):
         """ """
         self.Writer.close()
         try:
-            os.remove(
-                os.path.abspath(os.path.join(".", "tests", "data", "unittest.mzml"))
-            )
+            os.remove(os.path.abspath(os.path.join(".", "tests", "data", "unittest.mzml")))
         except FileNotFoundError:
             pass
         try:
-            os.remove(
-                os.path.abspath(os.path.join(".", "tests", "data", "unittest2.mzml"))
-            )
+            os.remove(os.path.abspath(os.path.join(".", "tests", "data", "unittest2.mzml")))
         except FileNotFoundError:
             pass
 
@@ -60,7 +55,7 @@ class GSGWTest(unittest.TestCase):
         )
 
     def test_write_gen_header_index(self):
-        self.Writer._write_gen_header(Index=True)
+        self.Writer._write_gen_header(index=True)
         self.Writer.close()
         file = open(self.paths[0], "rb")
         header = file.read()
@@ -79,7 +74,7 @@ class GSGWTest(unittest.TestCase):
         self.assertEqual(header[12], 1)  # version
 
     def test_write_gen_header_no_index(self):
-        self.Writer._write_gen_header(Index=False)
+        self.Writer._write_gen_header(index=False)
         self.Writer.close()
         file = open(self.paths[0], "rb")
         header = file.read()
@@ -112,9 +107,7 @@ class GSGWTest(unittest.TestCase):
         self.Writer._write_data(test_string)
         self.Writer.close()
         Decomp = zlib.decompressobj(-zlib.MAX_WBITS)
-        file = open(
-            os.path.join(os.path.dirname(__file__), "data", "unittest.mzml"), "rb"
-        )
+        file = open(os.path.join(os.path.dirname(__file__), "data", "unittest.mzml"), "rb")
         data = file.read()
         file.close()
         compData = data[:-8]
@@ -139,14 +132,12 @@ class GSGWTest(unittest.TestCase):
             "uncompressed",
             "CF_07062012_pH8_2_3A.mzML",
         )
-        self.Writer = GSGW(
+        self.Writer = GzipWriter(
             test_file,
             max_idx=80,
             max_idx_len=8,
             max_offset_len=8,
-            output_path=os.path.abspath(
-                os.path.join(".", "tests", "data", "unittest2.mzml")
-            ),
+            output_path=os.path.abspath(os.path.join(".", "tests", "data", "unittest2.mzml")),
         )
         self.Writer.add_data(test_string, "a")
         self.Writer.close()
@@ -172,8 +163,8 @@ class GSGWTest(unittest.TestCase):
         ]  # dont read header (first 15 bytes) and read idx_num * (idx_len + offset_len bytes) and zero termination
         identifier = index[:8].decode("latin-1")
         offset = index[8:16].decode("latin-1")
-        self.assertEqual(identifier.strip("\xAC"), "1")
-        self.assertIsInstance(offset.strip("\xAC"), str)
+        self.assertEqual(identifier.strip("\xac"), "1")
+        self.assertIsInstance(offset.strip("\xac"), str)
 
 
 if __name__ == "__main__":

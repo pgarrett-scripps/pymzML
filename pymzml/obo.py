@@ -56,36 +56,12 @@ OBO file. Please refer to :ref:`example_scripts` for further usage information.
 
 """
 
-
-# Python mzML module - pymzml
-# Copyright (C) 2010-2019 M. Kösters, C. Fufezan
-#     The MIT License (MIT)
-
-#     Permission is hereby granted, free of charge, to any person obtaining a copy
-#     of this software and associated documentation files (the "Software"), to deal
-#     in the Software without restriction, including without limitation the rights
-#     to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#     copies of the Software, and to permit persons to whom the Software is
-#     furnished to do so, subject to the following conditions:
-
-#     The above copyright notice and this permission notice shall be included in all
-#     copies or substantial portions of the Software.
-
-#     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#     IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#     FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#     AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-#     SOFTWARE.
-
-
 import sys
 import os
 import re
 import gzip
 import urllib.request
-from typing import Dict, List, Optional, Any, ClassVar, Pattern
+from typing import Any, ClassVar, Pattern
 
 
 class OboTranslator(object):
@@ -97,22 +73,22 @@ class OboTranslator(object):
         version (str): obo version
     """
 
-    _obo_instance_cache: ClassVar[Dict[Optional[str], "OboTranslator"]] = {}
+    _obo_instance_cache: ClassVar[dict[str | None, "OboTranslator"]] = {}
 
-    def __init__(self, version: Optional[str] = None) -> None:
-        self.version: Optional[str] = self._normalize_version(version)
-        self.all_dicts: List[Dict[str, Any]] = []
-        self.id: Dict[str, Dict[str, Any]] = {}
-        self.name: Dict[str, Dict[str, Any]] = {}
-        self.definition: Dict[str, Dict[str, Any]] = {}
-        self.lookups: List[Dict[str, Dict[str, Any]]] = [self.id, self.name, self.definition]
+    def __init__(self, version: str | None = None) -> None:
+        self.version: str | None = self._normalize_version(version)
+        self.all_dicts: list[dict[str, Any]] = []
+        self.id: dict[str, dict[str, Any]] = {}
+        self.name: dict[str, dict[str, Any]] = {}
+        self.definition: dict[str, dict[str, Any]] = {}
+        self.lookups: list[dict[str, dict[str, Any]]] = [self.id, self.name, self.definition]
         self.MS_tag_regex: Pattern[str] = re.compile(r"MS:[0-9]*")
 
         # Only parse the OBO when necessary, not upon object construction
         self.__obo_parsed: bool = False
 
     @classmethod
-    def from_cache(cls, version: Optional[str]) -> "OboTranslator":
+    def from_cache(cls, version: str | None) -> "OboTranslator":
         normalized_version = cls._normalize_version(version)
         try:
             return cls._obo_instance_cache[normalized_version]
@@ -123,7 +99,7 @@ class OboTranslator(object):
     def __setitem__(self, key: str, value: Any) -> None:
         raise TypeError("OBO translator dictionaries only support assignment via .add")
 
-    def __getitem__(self, key: str) -> Optional[Any]:
+    def __getitem__(self, key: str) -> Any | None:
         if not self.__obo_parsed:
             self.parseOBO()
 
@@ -138,7 +114,7 @@ class OboTranslator(object):
         return None
 
     @staticmethod
-    def _normalize_version(version: Optional[str]) -> Optional[str]:
+    def _normalize_version(version: str | None) -> str | None:
         """
         Ensure that a version has 3 components, defaulting to .0 for the
         missing components.
@@ -159,7 +135,7 @@ class OboTranslator(object):
 
         return version
 
-    def download_obo(self, version: Optional[str], obo_file: str) -> None:
+    def download_obo(self, version: str | None, obo_file: str) -> None:
         uri = f"https://raw.githubusercontent.com/pymzml/psi-ms-CV/v{self.version}/psi-ms.obo"
         urllib.request.urlretrieve(uri, obo_file)
 
@@ -215,7 +191,7 @@ class OboTranslator(object):
                 )
 
         with open_func(obo_file, "rt", encoding="utf-8") as obo:
-            collections: Dict[str, str] = {}
+            collections: dict[str, str] = {}
             collect = False
             for line in obo:
                 if line.strip() in ("[Term]", ""):
@@ -230,7 +206,7 @@ class OboTranslator(object):
                         collections[line[:k]] = line[k + 1 :].strip()
         return
 
-    def add(self, collection_dict: Dict[str, Any]) -> None:
+    def add(self, collection_dict: dict[str, Any]) -> None:
         """
         Add a new dict to the translator.
 

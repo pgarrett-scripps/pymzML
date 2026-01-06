@@ -3,6 +3,7 @@
 """
 Part of pymzml test cases
 """
+
 import os
 from pymzml.file_classes.indexedGzip import IndexedGzip
 import unittest
