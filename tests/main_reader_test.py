@@ -7,7 +7,7 @@ import os
 import re
 import pymzml.run as run
 import unittest
-from pymzml import Spectrum, Chromatogram
+from pymzml import Spectrum
 import test_file_paths
 
 
@@ -49,13 +49,13 @@ class runTest(unittest.TestCase):
 
     def test_determine_file_encoding(self):
         """ """
-        encoding = self.reader_compressed_indexed._determine_file_encoding(self.paths[2])
+        encoding = self.reader_compressed_indexed._determine_file_encoding(self.paths[2]) # type: ignore
         self.assertEqual(encoding, "ISO-8859-1")
-        encoding = self.reader_compressed_unindexed._determine_file_encoding(self.paths[1])
+        encoding = self.reader_compressed_unindexed._determine_file_encoding(self.paths[1]) # type: ignore
         self.assertEqual(encoding, "ISO-8859-1")
-        encoding = self.reader_uncompressed_indexed._determine_file_encoding(self.paths[3])
+        encoding = self.reader_uncompressed_indexed._determine_file_encoding(self.paths[3]) # type: ignore
         self.assertEqual(encoding, "ISO-8859-1")
-        encoding = self.reader_uncompressed_unindexed._determine_file_encoding(self.paths[0])
+        encoding = self.reader_uncompressed_unindexed._determine_file_encoding(self.paths[0]) # type: ignore
         self.assertEqual(encoding, "ISO-8859-1")
 
     def test_init_iter(self):

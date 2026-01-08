@@ -22,4 +22,3 @@ docs/source/code_inc/
 
 # uv
 .venv
-uv.lock

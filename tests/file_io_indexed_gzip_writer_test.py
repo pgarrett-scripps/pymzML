@@ -54,7 +54,7 @@ class GSGWTest(unittest.TestCase):
         )
 
     def test_write_gen_header_index(self):
-        self.Writer._write_gen_header(index=True)
+        self.Writer.write_gen_header(index=True)
         self.Writer.close()
         file = open(self.paths[0], "rb")
         header = file.read()
@@ -73,7 +73,7 @@ class GSGWTest(unittest.TestCase):
         self.assertEqual(header[12], 1)  # version
 
     def test_write_gen_header_no_index(self):
-        self.Writer._write_gen_header(index=False)
+        self.Writer.write_gen_header(index=False)
         self.Writer.close()
         file = open(self.paths[0], "rb")
         header = file.read()
@@ -88,7 +88,7 @@ class GSGWTest(unittest.TestCase):
         self.assertEqual(len(header), 10)
 
     def test_allocate_index_bytes(self):
-        self.Writer._allocate_index_bytes()
+        self.Writer._allocate_index_bytes()# type: ignore
         self.Writer.close()
         file = open(self.paths[0], "rb")
         data = file.read()
@@ -103,7 +103,7 @@ class GSGWTest(unittest.TestCase):
 
     def test_write_data(self):
         test_string = b"AAAAAAAAbbbbbbbbCCCCCCCC"
-        self.Writer._write_data(test_string)
+        self.Writer._write_data(test_string)# type: ignore
         self.Writer.close()
         Decomp = zlib.decompressobj(-zlib.MAX_WBITS)
         file = open(os.path.join(os.path.dirname(__file__), "data", "unittest.mzml"), "rb")
@@ -121,7 +121,7 @@ class GSGWTest(unittest.TestCase):
         self.Writer.add_data(test_string, 1)
         self.Writer.close()
         file = open(self.paths[0], "rb")
-        data = file.read()
+        _: bytes = file.read()
         file.close()
         index = self.Writer.index
         self.assertIn(1, index)
@@ -141,7 +141,7 @@ class GSGWTest(unittest.TestCase):
         self.Writer.add_data(test_string, "a")
         self.Writer.close()
         file = open(self.paths[0], "rb")
-        data = file.read()
+        _: bytes = file.read()
         file.close()
         index = self.Writer.index
         self.assertIn("a", index)

@@ -125,4 +125,4 @@ Part of pymzml test cases
 #         assert t1 < t2
 
 if __name__ == "__main__":
-    unittest.main(verbosity=3)
+    unittest.main(verbosity=3) # type: ignore

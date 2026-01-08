@@ -1,16 +1,25 @@
-# Introduction
+# PyMZML-Turbo
 
-![Documentation Status](https://readthedocs.org/projects/pymzml/badge/?version=latest)
-![PyPI version](https://img.shields.io/pypi/v/pymzML.svg)
-![Downloads](https://pepy.tech/badge/pymzml)
-![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)
-![Research software impact](http://depsy.org/api/package/pypi/pymzML/badge.svg)
+This fork is a major refactor of pymzml. Most functionality is preserved so it should serve as a drop in replacement for the most part.
+
+- Removed all depriciated code
+- Added strict type annoations
+- UV backend
+- Makefile
+- strict numpy dependancy
+  - allows for faster centroiding
+- Python 3.11 style code (StrEnum, Match / Case ...)
+- Ddatalasses used where applicable (most notable replacing the info dictionary)
+- Improved readability / maintanability
+- Namespace support (import pymzml as pmz)
+- Removed plotting functionality 
+- docs & examples added to README
 
 ## General information
 
-Module to parse mzML data in Python based on cElementTree
+pymzml-turbo is a fork of [pymzml](https://github.com/pymzml/pymzML) (a package to parse mzML data in Python based on cElementTree)
 
-Copyright 2010-2024 by:
+pymzml Copyright 2010-2024 by:
 
 - M. Kösters,
 - J. Leufken,
@@ -23,87 +32,223 @@ Copyright 2010-2024 by:
 - S.A. Leidel,
 - C. Fufezan,
 
-### Contact information
+## Quick Start Tutorial
 
-Please refer to:
-
-> Dr. Christian Fufezan
-> Group Leader Experimental Bioinformatics
-> Cellzome GmbH
-> R&D Platform Technology & Science
-> GSK
-> Germany
-> eMail: christian@fufezan.net
->
-> https://fufezan.net
-
-## Summary
-
-pymzML is an extension to Python that offers:
-
-- a) easy access to mass spectrometry (MS) data that allows the rapid development of tools
-- b) a very fast parser for mzML data, the standard mass spectrometry data format
-- c) a set of functions to compare and/or handle spectra
-- d) random access in compressed files
-- e) interactive data visualization
-
-## Implementation
-
-pymzML requires Python3.7+. The module is freely available on pymzml.github.com or pypi, published under MIT license and only requires numpy and regex, however there are several optional dependencies for extended functionality like interactive plotting and deconvolution.
-
-## Download
-
-Get the latest version via github: https://github.com/pymzml/pymzML
-
-The complete Documentation can be found here: https://pymzml.readthedocs.io/en/latest/
-
-## Citation
-
-M Kösters, J Leufken, S Schulze, K Sugimoto, J Klein, R P Zahedi, M Hippler, S A Leidel, C Fufezan; pymzML v2.0: introducing a highly compressed and seekable gzip format, Bioinformatics, doi: https://doi.org/10.1093/bioinformatics/bty046
-
-## Installation
-
-pymzML requires [Python](https://www.python.org/downloads/) 3.7 or higher.
-
-> **Note:** Consider to use a Python virtual environment for easy installation and use. Further, usage of python3.7+ is recommended.
-
-Download pymzML using [GitHub](https://github.com/pymzML/pymzml) **or** the zip file:
-
-**GitHub version:** Start by cloning the GitHub repository:
+### Installation
 
 ```bash
-git clone https://github.com/pymzML/pymzml.git
-cd pymzml
-pip install -r requirements.txt
-python setup.py install
+pip install pymzml-turbo
 ```
 
-**PyPI version:**
+### Basic Usage
 
-```bash
-pip install pymzml  # install standard version
-pip install "pymzml[plot]"  # with plotting support
-pip install "pymzml[pynumpress]"  # with pynumpress support
-pip install "pymzml[deconvolution]"  # with deconvolution support using ms_deisotope
-pip install "pymzml[full]"  # full featured
+Import the package:
+
+```python
+import pymzml as pmz
 ```
 
-If you have troubles installing the dependencies, install numpy first separately, since pynumpress requires numpy to be installed.
+### Reading mzML Files
 
-If you use Windows 7 please use the 'SDK7.1 command prompt' for installation of pymzML to assure correct compiling of the C extensions.
+```python
+# Open an mzML file
+# skip_chromatogram = True by default
+run = pmz.Reader("data.mzML")
 
-### Testing
-
-To test the package and correct installation:
-
-```bash
-tox
+# Access run information
+print(f"File: {run.info.file_name}")
+print(f"Spectra count: {run.info.spectrum_count}")
+print(f"Start time: {run.info.start_time}")
 ```
 
-## Contributing
+### Iterating Through Spectra
 
-Please read the contribution guidelines before contributing [here](/CONTRIBUTING.rst)
+```python
+# Iterate through all spectra
+for spectrum in run:
+    print(f"Spectrum {spectrum.ID}, MS level {spectrum.ms_level}")
+    print(f"Retention time: {spectrum.scan_time_in_minutes():.2f} min")
+    print(f"Number of peaks: {len(spectrum.peaks('raw'))}")
+```
 
-## Code of Conduct
+### Accessing Specific Spectra
 
-Since pymzML is an open source project maintained by the community, we established a code of conduct in order to facilitate an inclusive environment for all users, contributors and project memebers. Before contributing to pymzML, please read the code of conduct [here](/CODE_OF_CONDUCT.md)
+Accessing spectra via `run[identifier]` or `run.get_spectrum(identifier)` interprets integers first as Native IDs, then as indices. This can be ambiguous if a spectrum has Native ID "5" but you want the 6th spectrum (index 5).
+
+For unambiguous access, use the specific methods:
+
+```python
+# Unambiguous access by Native ID (str or int)
+spectrum = run.get_spectrum_by_id("spectrum_id_1")
+spectrum = run.get_spectrum_by_id(100)
+
+# Unambiguous access by 0-based Index
+spectrum = run.get_spectrum_by_index(0)  # First spectrum
+```
+
+### Working with Peaks
+
+```python
+# Get peaks from a spectrum
+peaks = spectrum.peaks('centroided')  # Returns list of (mz, intensity) tuples
+
+# Access m/z and intensity arrays separately
+mz_array = spectrum.mz
+intensity_array = spectrum.i
+
+# Find specific peaks
+target_mz = 820.77
+found_peaks = spectrum.has_peak(target_mz)
+if found_peaks:
+    for mz, intensity in found_peaks:
+        print(f"Found peak at m/z {mz:.4f} with intensity {intensity:.2f}")
+
+# Get highest intensity peaks
+top_peaks = spectrum.highest_peaks(5)  # Top 5 peaks
+for mz, intensity in top_peaks:
+    print(f"m/z: {mz:.4f}, intensity: {intensity:.2f}")
+```
+
+### Working with Chromatograms
+
+```python
+# Enable chromatogram access during iteration
+run = pmz.Reader("data.mzML", skip_chromatogram=False)
+
+# Access TIC (Total Ion Chromatogram)
+tic = run.TIC
+print(f"TIC has {len(tic.peaks())} data points")
+
+# Get chromatogram data
+for time, intensity in tic.peaks():
+    print(f"Time: {time:.2f}, Intensity: {intensity:.2f}")
+
+# Access by index (explicitly 0-based index)
+chromatogram = run.get_chromatogram_by_index(0)
+```
+
+### Extracting Ion Chromatograms (XIC/EIC)
+
+```python
+# Extract intensities for a specific m/z across time
+target_mz = 445.12
+time_intensities = []
+
+for spectrum in run:
+    if spectrum.ms_level == 1:
+        peaks = spectrum.has_peak(target_mz)
+        if peaks:
+            for mz, intensity in peaks:
+                time_intensities.append(
+                    (spectrum.scan_time_in_minutes(), intensity, mz)
+                )
+
+# Print results
+for rt, intensity, mz in time_intensities:
+    print(f"RT: {rt:.3f} min, Intensity: {intensity:.2e}, m/z: {mz:.5f}")
+```
+
+### Working with Precursors (MS2)
+
+```python
+# Access precursor information from MS2 spectra
+for spectrum in run:
+    if spectrum.ms_level == 2:
+        precursors = spectrum.selected_precursors
+        if precursors:
+            for precursor in precursors:
+                print(f"Precursor m/z: {precursor['mz']:.4f}")
+                print(f"Precursor intensity: {precursor.get('i', 'N/A')}")
+                print(f"Charge state: {precursor.get('charge', 'N/A')}")
+```
+
+### Spectrum Comparison
+
+```python
+# Compare two spectra using cosine similarity
+spectra = []
+for spectrum in run:
+    if spectrum.ms_level == 1:
+        spectra.append(spectrum)
+        if len(spectra) >= 2:
+            break
+
+# Calculate similarity (returns value between 0 and 1)
+similarity = spectra[0].similarity_to(spectra[1])
+print(f"Cosine similarity: {similarity:.4f}")
+
+# Perfect match with itself
+self_similarity = spectra[0].similarity_to(spectra[0])
+print(f"Self-similarity: {self_similarity:.4f}")  # Should be 1.0
+```
+
+### Advanced: Custom Precision
+
+```python
+# Define different mass precisions for MS1 and MS2
+run = pmz.Reader(
+    "data.mzML",
+    MS_precisions={
+        1: 5e-6,  # 5 ppm for MS1
+        2: 5e-4   # 500 ppm for MS2
+    }
+)
+
+# This affects peak matching functions like has_peak()
+```
+
+### Working with Compressed Files
+
+```python
+# pymzml-turbo automatically handles gzipped files
+run = pmz.Reader("data.mzML.gz")
+
+# Works exactly the same as uncompressed files
+for spectrum in run:
+    print(spectrum.ID)
+```
+
+### Complete Example
+
+```python
+import pymzml as pmz
+
+# Open file
+run = pmz.Reader("data.mzML")
+
+# Print file summary
+print(f"File: {run.info['file_name']}")
+print(f"Total spectra: {run.info['spectrum_count']}")
+print()
+
+# Analyze MS1 spectra
+ms1_count = 0
+total_peaks = 0
+
+for spectrum in run:
+    if spectrum.ms_level == 1:
+        ms1_count += 1
+        peaks = spectrum.peaks('centroided')
+        total_peaks += len(peaks)
+        
+        # Get base peak (highest intensity)
+        if peaks:
+            base_peak = max(peaks, key=lambda x: x[1])
+            print(f"Spectrum {spectrum.ID}:")
+            print(f"  RT: {spectrum.scan_time_in_minutes():.2f} min")
+            print(f"  Base peak: m/z {base_peak[0]:.4f}, intensity {base_peak[1]:.2e}")
+
+print(f"\nTotal MS1 spectra: {ms1_count}")
+print(f"Average peaks per MS1: {total_peaks / ms1_count:.1f}")
+```
+
+### Context Manager
+
+```python
+# Context manager ensures proper cleanup
+with pmz.Reader("data.mzML") as run:
+    for spectrum in run:
+        # Process spectrum
+        pass
+```
+

@@ -4,7 +4,6 @@ import unittest
 
 sys.path.append(os.path.abspath("."))
 
-import pymzml
 from pymzml.spec import PROTON_MASS
 import pymzml.run as run
 import test_file_paths

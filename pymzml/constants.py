@@ -4,9 +4,8 @@ from enum import StrEnum
 class PeakType(StrEnum):
     """Enumeration of peak types."""
 
-    RAW = "raw"
+    PROFILE = "profile"
     CENTROIDED = "centroided"
-    REPROFILED = "reprofiled"
     DECONVOLUTED = "deconvoluted"
 
 
@@ -24,6 +23,15 @@ class DataType(StrEnum):
     MZ = "mz"
     INTENSITY = "i"
     TIME = "time"
+
+
+class TimeUnit(StrEnum):
+    """Enumeration of time units."""
+
+    MILLISECOND = "millisecond"
+    SECOND = "second"
+    MINUTE = "minute"
+    HOUR = "hour"
 
 
 class BinaryDataType(StrEnum):
@@ -136,6 +144,17 @@ class ChromatogramMSAccession(StrEnum):
     POSITIVE_SCAN = "MS:1000129"
     NEGATIVE_SCAN = "MS:1000130"
     ISOLATION_WINDOW_TARGET_MZ = "MS:1000827"
+
+
+class SpectrumMSAccession(StrEnum):
+    """Enumeration of MS accessions for spectrum properties."""
+
+    MS_LEVEL = "MS:1000511"
+    SCAN_START_TIME = "MS:1000016"
+    SELECTED_ION_MZ = "MS:1000744"
+    PEAK_INTENSITY = "MS:1000042"
+    CHARGE_STATE = "MS:1000041"
+    TOTAL_ION_CURRENT = "MS:1000285"
 
 
 class XMLNamespace(StrEnum):

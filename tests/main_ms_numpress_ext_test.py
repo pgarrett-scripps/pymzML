@@ -1,11 +1,6 @@
 import unittest
-import struct
-import math
 
-try:
-    import numpy as np
-except:
-    np = None
+import numpy as np
 
 try:
     import pynumpress
@@ -32,6 +27,7 @@ class test_MSNumpress(unittest.TestCase):
         self.fixed_point = 10000
 
     def test_encode_slof(self):
+        import pynumpress
         fp = pynumpress.optimal_slof_fixed_point(self.i_slof_data)
         encoded_array = pynumpress.encode_slof(np.asarray(self.i_slof_data, dtype=np.float64), fp)
 

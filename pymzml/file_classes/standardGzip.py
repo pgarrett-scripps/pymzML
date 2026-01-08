@@ -1,85 +1,137 @@
-"""
-Interface for gzipped mzML files.
-"""
-
 import codecs
 import gzip
 from xml.etree.ElementTree import iterparse
 
-from .. import regex_patterns
-from .. import spec
-from .. import chromatogram
+from .. import chromatogram, regex_patterns, spec
 
 
 class StandardGzip:
     def __init__(self, path: str, encoding: str) -> None:
-        """
-        Initalize Wrapper object for gzipped mzML files.
-
-        Arguments:
-            path (str)     : path to the file
-            encoding (str) : encoding of the file
-        """
         self.path: str = path
-        self.file_handler = codecs.getreader(encoding)(gzip.open(path))
+        self.file_handler = codecs.getreader(encoding)(gzip.open(path))  # noqa: SIM115
         self.offset_dict: None = self._build_index()
-        return
 
     def close(self) -> None:
         self.file_handler.close()
 
     def _build_index(self) -> None:
-        """
-        Cant build index for standard gzip files
-        """
-        # raise Exception('Cant build index for gzip files')
+        """No index available for standard gzip files (random access not supported)."""
         pass
 
     def read(self, size: int = -1) -> str:
-        """
-        Read binary data from file handler.
-
-        Keyword Arguments:
-            size (int): Number of bytes to read from file, -1 to read to end of file
-
-        Returns:
-            data (str): byte string of len size of input data
-        """
+        """Read data from file. Default (-1) reads entire file."""
         return self.file_handler.read(size)
 
-    def __getitem__(self, identifier: int | str) -> spec.Spectrum | chromatogram.Chromatogram:
-        """
-        Access the item with id 'identifier' in the file by iterating the xml-tree.
+    def get_spectrum_by_id(self, spectrum_id: int | str) -> spec.Spectrum:
+        """Retrieve spectrum by native ID.
 
-        Arguments:
-            identifier (str): native id of the item to access
-
-        Returns:
-            data (str): text associated with the given identifier
+        Raises:
+            KeyError: If spectrum ID is not found.
         """
         old_pos = self.file_handler.tell()
         self.file_handler.seek(0, 0)
         mzml_iter = iterparse(self.file_handler, events=["end"])
 
         for event, element in mzml_iter:
-            if event == "end":
-                if element.tag.endswith("}spectrum"):
-                    spec_id = element.get("id")
-                    if spec_id:
-                        match = regex_patterns.SPECTRUM_ID_PATTERN.search(spec_id)
-                        if match:
-                            spec_id_num = int(match.group(1))
-                            if spec_id_num == identifier:
-                                self.file_handler.seek(old_pos, 0)
-                                return spec.Spectrum(element, measured_precision=5e-6)
-                elif element.tag.endswith("}chromatogram"):
-                    if element.get("id") == identifier:
-                        self.file_handler.seek(old_pos, 0)
-                        return chromatogram.Chromatogram(element, measured_precision=5e-6)
+            if event == "end" and element.tag.endswith("}spectrum"):
+                spec_id = element.get("id")
+                if spec_id:
+                    if spec_id == str(spectrum_id):
+                         self.file_handler.seek(old_pos, 0)
+                         return spec.Spectrum(element)
+                    
+                    match = regex_patterns.SPECTRUM_ID_PATTERN.search(spec_id)
+                    if match:
+                        spec_id_num = int(match.group(1))
+                        if spec_id_num == spectrum_id:
+                            self.file_handler.seek(old_pos, 0)
+                            return spec.Spectrum(element)
 
-        # If we get here, identifier was not found
+        self.file_handler.seek(old_pos, 0)
+        raise KeyError(f"Spectrum ID {spectrum_id} not found in file")
+
+    def get_spectrum_by_index(self, index: int) -> spec.Spectrum:
+        """Retrieve spectrum by 0-based index.
+
+        Raises:
+            IndexError: If index is out of range.
+        """
+        old_pos = self.file_handler.tell()
+        self.file_handler.seek(0, 0)
+        mzml_iter = iterparse(self.file_handler, events=["end"])
+
+        current_index = 0
+        for event, element in mzml_iter:
+            if event == "end" and element.tag.endswith("}spectrum"):
+                if current_index == index:
+                    self.file_handler.seek(old_pos, 0)
+                    return spec.Spectrum(element)
+                current_index += 1
+
+        self.file_handler.seek(old_pos, 0)
+        raise IndexError(f"Index {index} out of range [0, {current_index})")
+
+    def get_chromatogram_by_id(self, chromatogram_id: str) -> chromatogram.Chromatogram:
+        """Retrieve chromatogram by native ID."""
+        old_pos = self.file_handler.tell()
+        self.file_handler.seek(0, 0)
+        mzml_iter = iterparse(self.file_handler, events=["end"])
+
+        for event, element in mzml_iter:
+            if (
+                event == "end"
+                and element.tag.endswith("}chromatogram")
+                and element.get("id") == chromatogram_id
+            ):
+                self.file_handler.seek(old_pos, 0)
+                return chromatogram.Chromatogram(element, measured_precision=5e-6)
+        
+        self.file_handler.seek(old_pos, 0)
+        raise KeyError(f"Chromatogram ID {chromatogram_id} not found")
+
+    def get_chromatogram_by_index(self, index: int) -> chromatogram.Chromatogram:
+        """Retrieve chromatogram by 0-based index."""
+        old_pos = self.file_handler.tell()
+        self.file_handler.seek(0, 0)
+        mzml_iter = iterparse(self.file_handler, events=["end"])
+        
+        current_index = 0
+        for event, element in mzml_iter:
+            if event == "end" and element.tag.endswith("}chromatogram"):
+                if current_index == index:
+                    self.file_handler.seek(old_pos, 0)
+                    return chromatogram.Chromatogram(element, measured_precision=5e-6)
+                current_index += 1
+
+        self.file_handler.seek(old_pos, 0)
+        raise IndexError(f"Chromatogram Index {index} out of range")
+
+    def __getitem__(self, identifier: int | str) -> spec.Spectrum | chromatogram.Chromatogram:
+        """Retrieve spectrum or chromatogram by ID or index.
+
+        For integers: tries spectrum ID first, then falls back to 0-based index.
+        """
+        if isinstance(identifier, int):
+            try:
+                return self.get_spectrum_by_id(identifier)
+            except KeyError:
+                try:
+                    return self.get_spectrum_by_index(identifier)
+                except IndexError:
+                    raise KeyError(f"Identifier {identifier} not found in file") from None
+
+        old_pos = self.file_handler.tell()
+        self.file_handler.seek(0, 0)
+        mzml_iter = iterparse(self.file_handler, events=["end"])
+
+        for event, element in mzml_iter:
+            if (
+                event == "end"
+                and element.tag.endswith("}chromatogram")
+                and element.get("id") == identifier
+            ):
+                self.file_handler.seek(old_pos, 0)
+                return chromatogram.Chromatogram(element, measured_precision=5e-6)
+
+        self.file_handler.seek(old_pos, 0)
         raise KeyError(f"Identifier '{identifier}' not found in file")
-
-
-if __name__ == "__main__":
-    print(__doc__)

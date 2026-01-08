@@ -1,7 +1,4 @@
-"""
-The MsData class offers a base class for mass spectrometry data.
-It provides common functionality for both Spectrum and Chromatogram classes.
-"""
+"""Base class for mass spectrometry data with common functionality for Spectrum and Chromatogram."""
 
 from typing import Any
 
@@ -30,38 +27,24 @@ from .decoder import MSDecoder
 
 
 class MsData:
-    """
-    General base class for mass spectrometry data handling.
-    Provides common functionality for both Spectrum and Chromatogram classes.
-    """
+    """Base class for mass spectrometry data with common functionality for Spectrum and Chromatogram."""
 
     def __init__(
         self,
-        element: ElementTree.Element | None = None,
-        measured_precision: float = 5e-6,
+        element: ElementTree.Element,
         *,
         obo_version: str | None = None,
     ) -> None:
-        """
-        Initialize MsData base class.
-
-        Arguments:
-            element: XML ElementTree element containing the data
-            measured_precision: Measurement precision in ppm (e.g., 5e-6 for 5 ppm)
-            obo_version: OBO version string (optional)
-        """
+        """Initialize MsData with XML element and measurement precision."""
         # Core attributes
         self.element: ElementTree.Element | None = element
-        self._measured_precision: float = measured_precision
-        self.internal_precision: int = int(round(50000.0 / (measured_precision * 1e6)))
         self.obo_translator: OboTranslator = OboTranslator.from_cache(obo_version)
         self.noise_level_estimate: dict[str, float] = {}
 
         # XML namespace
         self.ns: str = ""
-        if self.element is not None:
-            match = re.match(r"\{.*\}", self.element.tag)
-            self.ns = match.group(0) if match else ""
+        match = re.match(r"\{.*\}", self.element.tag)
+        self.ns = match.group(0) if match else ""
 
         # Data arrays (lazily loaded) - always stored as numpy arrays internally
         self._mz: NDArray[np.float64] | None = None
@@ -73,8 +56,8 @@ class MsData:
         self.accessions: dict[str, str] = {}
 
     def _read_accessions(self) -> None:
-        """Set all required variables for this spectrum."""
-        self.accessions = {}
+        """Extract and cache accessions from XML element."""
+        self.accessions: dict[str, str] = {}
         if self.element is None:
             raise ValueError("ElementTree element is None.")
 
@@ -88,15 +71,7 @@ class MsData:
             self._profile = True
 
     def get_element_by_name(self, name: str) -> ElementTree.Element | None:
-        """
-        Get element from the original tree by its unit name.
-
-        Arguments:
-            name (str): unit name of the mzml element.
-
-        Returns:
-            element: XML element with the given name, or None if not found
-        """
+        """Get XML element by name from the tree."""
         if self.element is None:
             return None
 
@@ -106,21 +81,7 @@ class MsData:
         return None
 
     def get_element_by_path(self, hooks: list[str]) -> list[ElementTree.Element] | None:
-        """
-        Find elements in spectrum by its path.
-
-        Arguments:
-            hooks (list): list of parent elements for the target element.
-
-        Returns:
-            elements (list): list of XML objects found in the path
-
-        Example:
-            To access cvParam in scanWindow tag:
-
-            >>> spec.get_element_by_path(['scanList', 'scan', 'scanWindowList',
-            ...     'scanWindow', 'cvParam'])
-        """
+        """Find XML elements by hierarchical path of parent elements."""
         if not hooks or self.element is None:
             return None
 
@@ -141,18 +102,7 @@ class MsData:
             raise ValueError(f"Unknown data type: {d_type}")
 
     def _get_encoding_parameters(self, array_type: str) -> tuple[bytes, str, str, list[str]]:
-        """
-        Find the correct parameter for decoding and return them as tuple.
-
-        Arguments:
-            array_type (str): data type of the array, e.g. m/z, time or intensity
-
-        Returns:
-            data (bytes): encoded data
-            d_array_length (str): length of the data array
-            d_type (str): data type (e.g., "32-bit float")
-            comp (List[str]): compression methods
-        """
+        """Extract encoding parameters (data, length, type, compression) for array decoding."""
         if self.element is None:
             raise ValueError("ElementTree element is None.")
 
@@ -196,15 +146,7 @@ class MsData:
         return (data, d_array_length, d_type, comp)
 
     def _find_data_type(self, b_data_array: ElementTree.Element) -> str:
-        """
-        Find the data type from the binary data array element.
-
-        Arguments:
-            b_data_array: Binary data array XML element
-
-        Returns:
-            Data type name (e.g., "32-bit float")
-        """
+        """Find data type from binary data array element."""
         # List of data types to check, in order of preference
 
         for data_type in BinaryDataType:
@@ -224,37 +166,10 @@ class MsData:
         # Default to 64-bit float if nothing found
         return BinaryDataType.FLOAT_64
 
-    @property
-    def measured_precision(self) -> float:
-        """
-        Get the measured precision.
-
-        Returns:
-            value (float): measured Precision (e.g. 5e-6)
-        """
-        return self._measured_precision
-
-    @measured_precision.setter
-    def measured_precision(self, value: float) -> None:
-        """Set the measured and internal precision."""
-        self._measured_precision = value
-        self.internal_precision = int(round(50000.0 / (value * 1e6)))
-
     def _decode(
         self, data: bytes, d_array_length: str, data_type: str, comp: list[str]
     ) -> NDArray[np.float64]:
-        """
-        Decode the b64 encoded and packed strings from data as numpy arrays.
-
-        Arguments:
-            data: Base64 encoded binary data
-            d_array_length: Length of the data array as string
-            data_type: Data type (e.g., "32-bit float")
-            comp: List of compression methods
-
-        Returns:
-            Decoded numpy array
-        """
+        """Decode base64 encoded and compressed binary data to numpy array."""
         out_data: bytes | NDArray[np.float64] = b64dec(data)
 
         if len(out_data) == 0:
@@ -279,23 +194,13 @@ class MsData:
         )
 
     def _decode_numpress(self, data: bytes, compression: list[str]) -> NDArray[np.float64]:
-        """
-        Decode numpress encoded data (golomb-rice encoding).
-
-        Arguments:
-            data: Encoded data bytes
-            compression: Decompression algorithm to be used
-                (valid are 'ms-np-linear', 'ms-np-pic', 'ms-np-slof')
-
-        Returns:
-            Decoded numpy array of floats
-        """
+        """Decode numpress compressed data using golomb-rice encoding."""
         comp_ms_tags: list[str] = []
         for comp in compression:
             obo_entry = self.obo_translator[comp]
-            if isinstance(obo_entry, dict) and (entry_id := obo_entry.get("id")): # type: ignore
-                comp_ms_tags.append(entry_id) # type: ignore
-                
+            if isinstance(obo_entry, dict) and (entry_id := obo_entry.get("id")):  # type: ignore
+                comp_ms_tags.append(entry_id)  # type: ignore
+
         data_array = np.frombuffer(data, dtype=np.uint8)
 
         if MSAccession.NUMPRESS_LINEAR in comp_ms_tags:
@@ -310,35 +215,17 @@ class MsData:
     def _array(self, data: list[Any] | NDArray[Any]) -> NDArray[np.float64]:
         """Convert data to numpy array if needed."""
         if isinstance(data, np.ndarray):
-            return data.astype(np.float64) if data.dtype != np.float64 else data # type: ignore
+            return data.astype(np.float64) if data.dtype != np.float64 else data  # type: ignore
         return np.array(data, dtype=np.float64)
 
     def _median(self, data: list[float] | NDArray[np.float64]) -> float:
-        """
-        Compute median.
-
-        Arguments:
-            data: list or array of numeric values
-
-        Returns:
-            median of the input data
-        """
+        """Compute median of numeric data."""
         return float(np.median(data))
 
     def to_string(
         self, encoding: str = EncodingFormat.LATIN1, method: str = EncodingFormat.XML
     ) -> Any:
-        """
-        Return string representation of the xml element.
-
-        Keyword Arguments:
-            encoding: text encoding of the returned string (default: latin-1)
-            method: text format of the returned string (default: xml)
-                    alternatives are html and text
-
-        Returns:
-            xml string representation of the element
-        """
+        """Return string representation of the XML element in specified encoding and format."""
         if self.element is None:
             return b""
         return ElementTree.tostring(self.element, encoding=encoding, method=method)  # type: ignore[call-overload]

@@ -1,30 +1,13 @@
-"""
-Writer class for indexed gzipped files
-"""
-
 import struct
 import time
 import zlib
 from collections import OrderedDict
-from typing import BinaryIO
 from types import TracebackType
+from typing import BinaryIO
 
 
 class GzipWriter:
-    """
-
-    Generalized Gzip writer class with random access to indexed offsets.
-
-    Keyword Arguments:
-        file (string)        : Filename for the resulting file
-        max_idx (int)        : max number of indices which can be saved in
-                                this file
-        max_idx_len (int)    : maximal length of the index in bytes, must
-                                be between 1 and 255
-        max_offset_len (int) : maximal length of the offset in bytes
-        output_path (str)    : path to the output file
-
-    """
+    """Writer for indexed gzip files enabling random access to stored data blocks."""
 
     def __init__(
         self,
@@ -65,9 +48,7 @@ class GzipWriter:
         self.index_offset: int = 0
 
     def __del__(self) -> None:
-        """
-        Close the file object properly after this object is deleted
-        """
+        """Close file object on deletion."""
         try:
             if self._file_out is not None:
                 self._file_out.close()
@@ -75,55 +56,31 @@ class GzipWriter:
             pass
 
     def close(self) -> None:
-        """
-        Close the internal file object.
-        """
+        """Close file handler."""
         if self._file_out is not None:
             self._file_out.close()
 
     @property
     def file_out(self) -> BinaryIO:
-        """
-        Output filehandler
-        """
+        """Output file handler (lazy-initialized)."""
         if self._file_out is None:
-            self._file_out = open(self.file_name, "wb")
+            self._file_out = open(self.file_name, "wb")  # noqa: SIM115
         return self._file_out
 
     @property
     def encoding(self) -> str:
-        """
-        Returns the encoding used for this file
-        """
+        """File encoding for output."""
         return self._encoding
 
     @encoding.setter
     def encoding(self, encoding: str) -> None:
-        """
-        Set the file encoding for the output file.
-        """
+        """Set file encoding."""
         assert isinstance(encoding, str), "encoding must be a string"
         self._encoding = encoding
 
-    def _write_gen_header(self, index: bool = False, flags: list[str] | None = None) -> int:
-        """
-        Write a valid gzip header with creation time, user defined flag fields
-        and allocated index.
-
-        Keyword Arguments:
-            Index (bool)           : whether to or not to write an
-                                        index into this header.
-            FLAGS (list, optional) : list of flags (FTEXT, FHCRC, FEXTRA,
-                                        FNAME) to set for this header.
-
-        Returns:
-            offset (int): byte offset of the file pointer
-        """
-        _flags: list[str] = []
-        if flags is None:
-            _flags = []
-        else:
-            _flags = flags
+    def write_gen_header(self, index: bool = False, flags: list[str] | None = None) -> int:
+        """Write gzip header with optional index and custom flags."""
+        _flags: list[str] = flags if flags is not None else []
         FTEXT, FHCRC, FEXTRA, FNAME = 1, 2, 4, 8  # extra field bit flags
         current_time = int(time.time())
         time_byte = struct.pack("<L", current_time)
@@ -171,10 +128,7 @@ class GzipWriter:
         return self.file_out.tell()
 
     def _allocate_index_bytes(self) -> None:
-        """
-        Allocate 'self.max_index_num' bytes of length 'self.max_idx_len'
-        in the header for inserting the index later on.
-        """
+        """Allocate placeholder bytes for index entries in header."""
         id_placeholder = self.max_idx_len * b"\x01"
         offset_placeholder = self.max_offset_len * b"\x01"
         for _ in range(self.max_idx_num):
@@ -183,12 +137,7 @@ class GzipWriter:
         self.file_out.write(b"\x00")
 
     def _write_data(self, data: str | bytes | bytearray | memoryview) -> None:
-        """
-        Write data into file-stream.
-
-        Arguments:
-            data (str): uncompressed data
-        """
+        """Compress and write data to file with CRC32 and size fields."""
         Compressor = zlib.compressobj(
             self.comp_str, zlib.DEFLATED, -zlib.MAX_WBITS, zlib.DEF_MEM_LEVEL, 0
         )
@@ -210,69 +159,46 @@ class GzipWriter:
         self.file_out.write(struct.pack("<L", self.isize))
 
     def add_data(self, data: str | bytes, identifier: int | str) -> bool | None:
-        """
-        Create a new gzip member with compressed 'data' indexed with 'index'.
-
-        Arguments:
-            data (str)         : uncompressed data to write to file
-            index (str or int) : unique index for the data
-        """
+        """Create new gzip member with compressed data indexed by identifier."""
         if self.Lock:
             raise Exception("Cant add any more data if index is already written")
 
         if len(self.index) + 1 > self.max_idx_num:
             print(
-                """
+                f"""
                 WARNING: Reached maximum number of indexed data blocks
-                '({}), cannot add any more data!
-                """.format(self.max_idx_num)
+                '({self.max_idx_num}), cannot add any more data!
+                """
             )
             return False
 
         if not self.first_header_set:
-            self._write_gen_header(index=True)
+            self.write_gen_header(index=True)
             self.first_header_set = True
         else:
             # do we need this?
-            self._write_gen_header(index=False)
+            self.write_gen_header(index=False)
 
         self.index[identifier] = self.file_out.tell()
         self._write_data(data)
         return None
 
     def _write_identifier(self, identifier: int | str) -> None:
-        """
-        Convert and write the identifier into output file.
-
-        Arguments:
-            identifier (str or int): identifier to write into index
-        """
+        """Format and write identifier to index."""
         id_format = "{0:\xac>" + str(self.max_idx_len) + "}"
         identifier_str = str(identifier)
         identifier_bytes = id_format.format(identifier_str).encode("latin-1")
         self.file_out.write(identifier_bytes)
 
     def _write_offset(self, offset: int) -> None:
-        """
-        Convert and write offset to output file.
-
-        Arguments:
-            offset (int): offset which will be formatted and written
-                into file index
-        """
+        """Format and write offset to index."""
         offset_format = "{0:\xac>" + str(self.max_offset_len) + "}"
         offset_str = str(offset)
         offset_bytes = offset_format.format(offset_str).encode("latin-1")
         self.file_out.write(offset_bytes)
 
     def write_index(self) -> None:
-        """
-        Only called after all the data is written, i.e. all calls to
-        :func:`~GSGW.add_data` have been done.
-
-        Seek back to the beginning of the file and write the index into the
-        allocated comment bytes (see _write_gen_header(Index=True)).
-        """
+        """Write accumulated index to allocated header bytes after all data is written."""
         self.Lock = True
         self.file_out.seek(self.index_offset)
         for identifier, offset in self.index.items():
@@ -280,9 +206,7 @@ class GzipWriter:
             self._write_offset(offset)
 
     def __enter__(self) -> "GzipWriter":
-        """
-        Enable the with syntax for this class (entry point).
-        """
+        """Context manager entry."""
         return self
 
     def __exit__(
@@ -291,10 +215,6 @@ class GzipWriter:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        """Destructor when using this class with 'with .. as'."""
+        """Context manager exit."""
         if self._file_out is not None:
             self._file_out.close()
-
-
-if __name__ == "__main__":
-    print(__doc__)

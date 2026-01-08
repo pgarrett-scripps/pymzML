@@ -1,10 +1,11 @@
-from pymzml.run import Reader
-from pymzml.spec import Spectrum
-from .constants import PROTON_MASS, ISOTOPE_AVERAGE_DIFFERENCE, PeakType, NoiseMode, DataType
-from pymzml.chromatogram import Chromatogram
-from pymzml.decoder import MSDecoder
-from pymzml.obo import OboTranslator
-from pymzml.utils import GzipReader, GzipWriter
+from . import run
+from .chromatogram import Chromatogram
+from .constants import ISOTOPE_AVERAGE_DIFFERENCE, PROTON_MASS, DataType, NoiseMode, PeakType
+from .decoder import MSDecoder
+from .obo import OboTranslator
+from .run import Reader
+from .spec import Spectrum
+from .utils import GzipReader, GzipWriter
 
 __all__ = [
     "Reader",
@@ -19,4 +20,5 @@ __all__ = [
     "PeakType",
     "NoiseMode",
     "DataType",
+    "run",
 ]

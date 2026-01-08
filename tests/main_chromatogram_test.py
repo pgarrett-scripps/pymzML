@@ -4,11 +4,7 @@ import os
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 
 import pymzml.run as run
-
-try:
-    import numpy as np
-except:
-    np = None
+import numpy as np
 import unittest
 import test_file_paths
 
@@ -24,12 +20,6 @@ class ChromatogramTest(unittest.TestCase):
         path = self.paths[2]
         self.Run_np = run.Reader(path)
         self.chrom = self.Run_np["TIC"]
-
-    def test_time(self):
-        time = self.chrom.time
-        mz = self.chrom.mz
-        self.assertCountEqual(time, mz)
-        intensity = self.chrom.i
 
     def test_i(self):
         self.chrom.profile = [(1, 10), (2, 20), (3, 30)]

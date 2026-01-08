@@ -1,82 +1,24 @@
-"""
-Class to parse the obo file and set up the accessions library
+"""OBO file parser for MS accession mapping (MS:xxxxx to names)."""
 
-The OBO parser has been designed to convert MS:xxxxx tags to their appropriate
-names. A minimal set of MS accession is used in pymzML, but additional
-accessions can easily be queried.
-
-The obo translator is used internally to associate names with MS:xxxxxxx tags.
-
-The OboTranslator Class generates a dictionary and several lookup tables.
-e.g.
-
-::
-
-    >>> from pymzml.obo import OboTranslator as OT
-    >>> translator = OT()
-    >>> translator['MS:1000127']
-    'centroid mass spectrum'
-    >>> translator['positive scan']
-    {'is_a': 'MS:1000465 ! scan polarity', 'id': 'MS:1000130', 'def':
-    '"Polarity of the scan is positive." [PSI:MS]', 'name': 'positive scan'}
-    >>> translator['scan']
-    {'relationship': 'part_of MS:0000000 ! Proteomics Standards Initiative Mass
-    Spectrometry Ontology', 'id': 'MS:1000441', 'def': '"Function or process of
-    the mass spectrometer where it records a spectrum." [PSI:MS]', 'name':
-    'scan'}
-    >>> translator['unit']
-    {'relationship': 'part_of MS:0000000 ! Proteomics Standards Initiative Mass
-    Spectrometry Ontology', 'id': 'MS:1000460', 'def': '"Terms to describe
-    units." [PSI:MS]', 'name': 'unit'}
-
-pymzML comes with the queryOBO.py script that can be used to interrogate the
-OBO file. Please refer to :ref:`example_scripts` for further usage information.
-
-::
-
-    $ ./example_scripts/queryOBO.py "scan time"
-    MS:1000016
-    scan time
-    "The time taken for an acquisition by scanning analyzers." [PSI:MS]
-    Is a: MS:1000503 ! scan attribute
-    $
-
-
-::
-
-    $ ./example_scripts/queryOBO.py 1000016
-    MS:1000016
-    scan time
-    "The time taken for an acquisition by scanning analyzers." [PSI:MS]
-    MS:1000503 ! scan attribute
-    $
-
-
-"""
-
-import sys
+import contextlib
+import gzip
 import os
 import re
-import gzip
+import sys
 import urllib.request
-from typing import Any, ClassVar
 from re import Pattern
+from typing import Any, ClassVar
 
-from .constants import OBOKey, OBOSection, FileExtension
+from .constants import FileExtension, OBOKey, OBOSection
 
 
 class OboTranslator:
-    """
-    Generates a mapping from MS:xxxxx to names and vice versa for a specific
-    obo version
-
-    Args:
-        version (str): obo version
-    """
+    """Map MS accessions to names and vice versa for a specific obo version."""
 
     _obo_instance_cache: ClassVar[dict[str | None, "OboTranslator"]] = {}
 
     def __init__(self, version: str | None = None) -> None:
+        """Initialize OboTranslator with optional version specification."""
         self.version: str | None = self._normalize_version(version)
         self.all_dicts: list[dict[str, Any]] = []
         self.id: dict[str, dict[str, Any]] = {}
@@ -107,26 +49,14 @@ class OboTranslator:
         for lookup in self.lookups:
             if key in lookup:
                 if self.MS_tag_regex.match(key):
-                    try:
+                    with contextlib.suppress(Exception):
                         return lookup[key][OBOKey.NAME]
-                    except:
-                        pass
                 return lookup[key]
         return None
 
     @staticmethod
     def _normalize_version(version: str | None) -> str | None:
-        """
-        Ensure that a version has 3 components, defaulting to .0 for the
-        missing components.
-
-        Args:
-            version (str): The original version to modify.
-
-        Returns:
-            version (str): The version, normalized to ensure that it has 3
-                parts.
-        """
+        """Normalize version string to 3-part format (e.g., 1.2.0)."""
         if version is not None:
             parts = version.split(".")
 
@@ -137,6 +67,7 @@ class OboTranslator:
         return version
 
     def download_obo(self, version: str | None, obo_file: str) -> None:
+        """Download OBO file from GitHub and compress it."""
         uri = f"https://raw.githubusercontent.com/pymzml/psi-ms-CV/v{self.version}/psi-ms.obo"
         urllib.request.urlretrieve(uri, obo_file)
 
@@ -146,15 +77,8 @@ class OboTranslator:
         return
 
     def parseOBO(self) -> None:
+        """Parse OBO file from obo directory or download if needed."""
         self.__obo_parsed = True
-        """
-        Locate and parse the OBO file in the OBO root directory.
-
-        Note:
-
-           cx_Freeze friendly. If using cx_Freeze, place the OBO folder at
-           the location of sys.executable.
-        """
 
         # TODO: Try to get all the versions, even those without well-defined
         #       version numbers, or get remote hosting of all of the versions
@@ -208,44 +132,26 @@ class OboTranslator:
         return
 
     def add(self, collection_dict: dict[str, Any]) -> None:
-        """
-        Add a new dict to the translator.
-
-        Args:
-            collection_dict (dict): python dict containing MS:xxxxxxx name
-                mapping.
-        """
+        """Add a mapping dictionary to the translator."""
         if not self.__obo_parsed:
             self.parseOBO()
 
         self.all_dicts.append(collection_dict)
-        if OBOKey.ID in collection_dict.keys():
+        if OBOKey.ID in collection_dict:
             self.id[collection_dict[OBOKey.ID]] = self.all_dicts[-1]
-        if OBOKey.NAME in collection_dict.keys():
+        if OBOKey.NAME in collection_dict:
             self.name[collection_dict[OBOKey.NAME]] = self.all_dicts[-1]
-        if OBOKey.DEFINITION in collection_dict.keys():
+        if OBOKey.DEFINITION in collection_dict:
             self.definition[collection_dict[OBOKey.DEFINITION]] = self.all_dicts[-1]
 
         return
 
     def checkOBO(self, idTag: str, name: str) -> bool:
-        """
-        Check if idTag equals name in currently used obo version.
-
-        Args:
-            idTag (str): MS accession tag
-            name  (str): trivial name of the accession
-
-        Returns:
-            boolean: True if idTag and name correspond, else False.
-        """
+        """Check if MS accession tag matches given name."""
         if not self.__obo_parsed:
             self.parseOBO()
 
-        if self.id[idTag][OBOKey.NAME] == name:
-            return True
-        else:
-            return False
+        return self.id[idTag][OBOKey.NAME] == name
 
 
 if __name__ == "__main__":

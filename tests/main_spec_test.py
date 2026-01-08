@@ -5,11 +5,9 @@ sys.path.append(os.path.abspath("."))
 import pymzml.run as run
 from pymzml.spec import Spectrum
 from pymzml.chromatogram import Chromatogram
-import random
 import statistics as stat
 import unittest
 import test_file_paths
-from pprint import pprint
 
 import numpy as np
 
@@ -50,7 +48,6 @@ class SpectrumTest(unittest.TestCase):
         i = self.spec.i
         self.spec.i = [1, 2, 3]
         self.assertCountEqual(self.spec.i, [1, 2, 3])
-
 
     def test_reprofile_peaks(self):
         """ """

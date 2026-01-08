@@ -1,72 +1,120 @@
-"""
-Interface for indexed gzipped files
-
-@author: Manuel Koesters
-"""
-
-from collections import OrderedDict
-
 import codecs
 import gzip
+from collections import OrderedDict
 from xml.etree.ElementTree import XML
-from typing import Union
 
-from .. import spec
-from .. import chromatogram
+from .. import chromatogram, spec
 from ..utils.gzip_reader import GzipReader
 
 
 class IndexedGzip:
-    def __init__(self, path: str, encoding: str) -> None:
-        """
-        Initialize Wrapper object for indexed gzipped files.
+    """mzML reader with pre-built index for efficient random access to gzipped files."""
 
-        Arguments:
-            path (str)     : path to the file
-            encoding (str) : encoding of the file
-        """
+    def __init__(self, path: str, encoding: str) -> None:
         self.path: str = path
-        self.file_handler = codecs.getreader(encoding)(gzip.open(path))
+        self.file_handler = codecs.getreader(encoding)(gzip.open(path))  # noqa: SIM115
         self.offset_dict: OrderedDict[int | str, int] = OrderedDict()
         self._build_index()
 
     def __del__(self) -> None:
-        """Close handlers when deleting object."""
         self.Reader.close()
         self.file_handler.close()
 
     def _build_index(self) -> None:
-        """Use the GSGR class to retrieve the index from the file and save it."""
         self.Reader: GzipReader = GzipReader(self.path)
         self.offset_dict: OrderedDict[int | str, int] = self.Reader.index
 
     def read(self, size: int = -1) -> str:
-        """
-        Read binary data from file handler.
-
-        Keyword Arguments:
-            size (int): Number of bytes to read from file, -1 to read to end of file
-
-        Returns:
-            data (str): byte string of len size of input data
-        """
         return self.file_handler.read(size)
 
-    def __getitem__(
-        self, identifier: int | str
-    ) -> spec.Spectrum | chromatogram.Chromatogram:
+    def get_spectrum_by_id(self, spectrum_id: int | str) -> spec.Spectrum:
+        """Retrieve spectrum by its native ID.
+
+        Raises:
+            KeyError: If spectrum ID is not found.
         """
-        Access the item with id 'identifier' in the file.
+        if spectrum_id not in self.offset_dict:
+            raise KeyError(f"Spectrum ID {spectrum_id} not found in file")
 
-        Arguments:
-            identifier (str): native id of the item to access
+        ns_prefix = (
+            '<mzML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation='
+            '"http://psi.hupo.org/ms/mzml http://psidev.info/files/ms/mzML/xsd/mzML1.1.0.xsd" id="test_Creinhardtii_QE_pH8"'
+            ' version="1.1.0" xmlns="http://psi.hupo.org/ms/mzml">'
+        )
+        ns_suffix = "</mzML>"
+        data = self.Reader.read_block(spectrum_id)
+        element = XML(ns_prefix + data.decode("utf-8") + ns_suffix)
+        if "chromatogram" in element[0].tag:
+            raise ValueError(f"ID {spectrum_id} refers to a chromatogram, not a spectrum")
+        return spec.Spectrum(list(element)[0], measured_precision=5e-6)
 
-        Returns:
-            data (str): text associated with the given identifier
+    def get_spectrum_by_index(self, index: int) -> spec.Spectrum:
+        """Retrieve spectrum by 0-based index.
+
+        Raises:
+            IndexError: If index is out of range.
         """
+        numeric_keys = [k for k in self.offset_dict if isinstance(k, int)]
+        if not (0 <= index < len(numeric_keys)):
+            raise IndexError(f"Index {index} out of range [0, {len(numeric_keys)})")
+        spectrum_id = numeric_keys[index]
+        return self.get_spectrum_by_id(spectrum_id)
 
-        # TODO more elegant way to add NameSpace (.register_namespace maybe??)
-        ns_prefix = '<mzML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://psi.hupo.org/ms/mzml http://psidev.info/files/ms/mzML/xsd/mzML1.1.0.xsd" id="test_Creinhardtii_QE_pH8" version="1.1.0" xmlns="http://psi.hupo.org/ms/mzml">'
+    def get_chromatogram_by_id(self, chromatogram_id: str) -> chromatogram.Chromatogram:
+        """Retrieve chromatogram by its native ID."""
+        # IndexedGzip generally indexes things by ID.
+        # However, the GzipReader index seems to assume integer IDs for spectra.
+        # String IDs (chromatograms) handling depends on GzipReader implementation.
+        # Assuming GzipReader can handle string keys if they were indexed.
+        
+        # NOTE: GzipReader in pymzml usually handles numeric spectrum IDs.
+        # Checking if it supports arbitrary string lookups for chromatograms.
+        if chromatogram_id not in self.offset_dict:
+             # Fallback: We might not have indexed chromatograms by string ID
+             raise KeyError(f"Chromatogram ID {chromatogram_id} not found in index")
+
+        ns_prefix = (
+            '<mzML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation='
+            '"http://psi.hupo.org/ms/mzml http://psidev.info/files/ms/mzML/xsd/mzML1.1.0.xsd" id="test_Creinhardtii_QE_pH8" '
+            'version="1.1.0" xmlns="http://psi.hupo.org/ms/mzml">'
+        )
+        ns_suffix = "</mzML>"
+        data = self.Reader.read_block(chromatogram_id)
+        element = XML(ns_prefix + data.decode("utf-8") + ns_suffix)
+        if "chromatogram" not in element[0].tag:
+             raise ValueError(f"ID {chromatogram_id} refers to a spectrum, not a chromatogram")
+        return chromatogram.Chromatogram(list(element)[0], measured_precision=5e-6)
+
+    def get_chromatogram_by_index(self, index: int) -> chromatogram.Chromatogram:
+        """Retrieve chromatogram by 0-based index."""
+        chrom_keys = [k for k in self.offset_dict if isinstance(k, str) and k != "TIC"]
+        if not (0 <= index < len(chrom_keys)):
+            raise IndexError(f"Index {index} out of range [0, {len(chrom_keys)})")
+        chrom_id = chrom_keys[index]
+        return self.get_chromatogram_by_id(chrom_id)
+
+    def __getitem__(self, identifier: int | str) -> spec.Spectrum | chromatogram.Chromatogram:
+        """Retrieve spectrum or chromatogram by ID or index.
+
+        For integers: tries spectrum ID first, then falls back to 0-based index.
+        """
+        if isinstance(identifier, int):
+            try:
+                return self.get_spectrum_by_id(identifier)
+            except KeyError:
+                # Not a valid spectrum ID - try 0-based index
+                try:
+                    return self.get_spectrum_by_index(identifier)
+                except IndexError:
+                    raise KeyError(f"Identifier {identifier} not found in file") from None
+
+        # String identifiers (chromatogram IDs)
+        # TODO: Use .register_namespace for more elegant XML namespace handling
+        ns_prefix = (
+            '<mzML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation='
+            '"http://psi.hupo.org/ms/mzml http://psidev.info/files/ms/mzML/xsd/mzML1.1.0.xsd" id="test_Creinhardtii_QE_pH8" '
+            'version="1.1.0" xmlns="http://psi.hupo.org/ms/mzml">'
+        )
         ns_suffix = "</mzML>"
         data = self.Reader.read_block(identifier)
         element = XML(ns_prefix + data.decode("utf-8") + ns_suffix)
@@ -79,7 +127,3 @@ class IndexedGzip:
         """Close the handlers."""
         self.Reader.close()
         self.file_handler.close()
-
-
-if __name__ == "__main__":
-    print(__doc__)

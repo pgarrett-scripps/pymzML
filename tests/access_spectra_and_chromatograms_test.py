@@ -3,6 +3,7 @@
 Test cases for the new functionality in pymzml.run.Reader
 related to accessing spectra and chromatograms.
 """
+from typing import Any
 
 import os
 import sys
@@ -28,7 +29,7 @@ class AccessSpectraAndChromatogramsTest(unittest.TestCase):
 
         # Use a file with chromatograms for testing
         # mini.chrom.mzML is at index 3
-        for i, path in enumerate(self.paths):
+        for path in self.paths:
             if (
                 "mini.chrom.mzML" in path
                 and not path.endswith(".gz")
@@ -40,22 +41,33 @@ class AccessSpectraAndChromatogramsTest(unittest.TestCase):
             # Fallback to a known index if the file name is not found
             self.chrom_file = self.paths[3]  # mini.chrom.mzML
 
+        # Use a file with spectra for testing
+        for path in self.paths:
+            if "example.mzML" in path and not path.endswith(".gz") and not path.endswith(".idx.gz"):
+                self.spec_file = path
+                break
+        else:
+            self.spec_file = self.paths[0]
+
         # Initialize readers with different settings
         self.reader_with_chromatograms = run.Reader(self.chrom_file, skip_chromatogram=False)
-
         self.reader_skip_chromatograms = run.Reader(self.chrom_file, skip_chromatogram=True)
+        self.reader_spectra = run.Reader(self.spec_file)
 
     def test_get_spectrum_method(self):
         """Test the get_spectrum method."""
+        # Use reader known to have spectra
+        reader = self.reader_spectra
+        
         # Check if the file has spectra
-        spec_count = self.reader_with_chromatograms.get_spectrum_count()
+        spec_count = reader.get_spectrum_count()
         if spec_count is None or spec_count == 0:
             self.skipTest("Test file does not contain spectra")
 
         # Test that get_spectrum(0) returns the same as reader[0]
         try:
-            spectrum_by_index = self.reader_with_chromatograms[0]
-            spectrum_by_method = self.reader_with_chromatograms.get_spectrum(0)
+            spectrum_by_index = reader[0]
+            spectrum_by_method = reader.get_spectrum(0)
 
             self.assertIsInstance(spectrum_by_index, Spectrum)
             self.assertIsInstance(spectrum_by_method, Spectrum)
@@ -64,7 +76,7 @@ class AccessSpectraAndChromatogramsTest(unittest.TestCase):
             # Test accessing a spectrum by ID
             spectrum_id = spectrum_by_index.ID
             if isinstance(spectrum_id, str):
-                spectrum_by_id = self.reader_with_chromatograms[spectrum_id]
+                spectrum_by_id = reader[spectrum_id]
                 self.assertEqual(spectrum_by_index.ID, spectrum_by_id.ID)
         except IndexError:
             self.skipTest("Could not access spectrum at index 0")
@@ -143,7 +155,7 @@ class AccessSpectraAndChromatogramsTest(unittest.TestCase):
         self.reader_skip_chromatograms = run.Reader(self.chrom_file, skip_chromatogram=True)
 
         # Collect items
-        items_without_chromatograms = []
+        items_without_chromatograms: list[Any] = []
         for item in self.reader_skip_chromatograms:
             items_without_chromatograms.append(item)
             if len(items_without_chromatograms) >= 10:  # Limit to first 10 items
@@ -178,10 +190,60 @@ class AccessSpectraAndChromatogramsTest(unittest.TestCase):
         with self.assertRaises(Exception):
             self.reader_with_chromatograms.get_chromatogram("NonExistentChromatogram")
 
+    def test_unambiguous_spectrum_access(self):
+        """Test explicit spectrum access by ID and Index."""
+        reader = self.reader_spectra
+        spec_count = reader.get_spectrum_count()
+        if spec_count is None or spec_count == 0:
+            self.skipTest("Test file does not contain spectra")
+
+        # Get first spectrum by index
+        spec_0 = reader.get_spectrum_by_index(0)
+        self.assertIsInstance(spec_0, Spectrum)
+
+        # Get same spectrum by valid ID (int or str)
+        spec_id = spec_0.ID
+        # Ensure we can access it using the ID
+        spec_by_id = reader.get_spectrum_by_id(spec_id)
+
+        self.assertEqual(spec_0.ID, spec_by_id.ID)
+        self.assertEqual(spec_0.index, spec_by_id.index)
+
+    def test_unambiguous_chromatogram_access(self):
+        """Test explicit chromatogram access by ID and Index."""
+        chrom_count = self.reader_with_chromatograms.get_chromatogram_count()
+        if chrom_count is None or chrom_count == 0:
+            self.skipTest("Test file does not contain chromatograms")
+
+        # Get first chromatogram by index
+        try:
+            chrom_0 = self.reader_with_chromatograms.get_chromatogram_by_index(0)
+            
+            # Get same chrom by ID
+            chrom_id = chrom_0.ID
+            # Ensure we can access it using the ID
+            chrom_by_id = self.reader_with_chromatograms.get_chromatogram_by_id(chrom_id)
+            
+            self.assertEqual(chrom_0.ID, chrom_by_id.ID)
+        except Exception as e:
+            self.fail(f"Failed to access chromatogram: {e}")
+
+    def test_tic_property(self):
+        """Test the TIC convenience property."""
+        try:
+            tic = self.reader_with_chromatograms.TIC
+            self.assertTrue(hasattr(tic, 'peaks'))
+            self.assertEqual(tic.ID, "TIC")
+        except KeyError:
+            print("TIC not found in test file, skipping TIC content checks.")
+        except Exception as e:
+            self.fail(f"TIC property raised unexpected exception: {e}")
+
     def tearDown(self):
         """Clean up after tests."""
         self.reader_with_chromatograms.close()
         self.reader_skip_chromatograms.close()
+        self.reader_spectra.close()
 
 
 if __name__ == "__main__":

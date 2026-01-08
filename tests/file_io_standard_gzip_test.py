@@ -3,14 +3,10 @@
 Part of pymzml test cases
 """
 
-import os
 from pymzml.file_classes.standardGzip import StandardGzip
 import unittest
-import random
 from pymzml.spec import Spectrum
 from pymzml.chromatogram import Chromatogram
-import re
-import struct
 import test_file_paths
 
 

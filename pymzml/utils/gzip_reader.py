@@ -1,25 +1,16 @@
-"""
-Reader class for indexed gzipped files
-"""
-
+import contextlib
 import struct
 import zlib
 from collections import OrderedDict
-from typing import BinaryIO
 from types import TracebackType
+from typing import BinaryIO
 
 
 class GzipReader:
-    """
-    Generalized Gzip reader class which enables random access in files
-    written with the :class:`~pymzml.utils.GSGW.GSGW` class.
-
-    Keyword Arguments:
-        file (str): path to file to read
-    """
+    """Random-access reader for indexed gzip files."""
 
     def __init__(self, file: str) -> None:
-        self.file_in: BinaryIO = open(file, "rb")
+        self.file_in: BinaryIO = open(file, "rb")  # noqa: SIM115
         self.filename: str = file
         self.magic_bytes: bytes = b"\x1f\x8b"
         self.indexed: bool = True
@@ -54,33 +45,15 @@ class GzipReader:
             self._read_index()
 
     def __del__(self) -> None:
-        try:
+        with contextlib.suppress(Exception):
             self.close()
-        except Exception:
-            pass
 
     def seek(self, offset: int) -> None:
-        """
-        Seek to byte offset in input file.
-
-        Arguments:
-            offset (int): byte offset to seek to in FileIn
-
-        Returns:
-            None
-        """
+        """Seek to byte offset in file."""
         self.file_in.seek(offset)
 
     def read_block(self, index: int | str) -> bytes:
-        """
-        Read and return the data block with the unique index `index`
-
-        Arguments:
-            index(int or str): identifier associated with a specific block
-
-        Returns:
-            data (str): indexed text block as string
-        """
+        """Read and return data block for the given index."""
         start: int = self.index[index]
         try:
             end = self.index[int(index) + 1]
@@ -93,17 +66,12 @@ class GzipReader:
         return data
 
     def _check_magic_bytes(self) -> bool:
-        """
-        Check if file is a gzip file.
-        """
+        """Check if file has gzip magic bytes."""
         mb = self.file_in.read(2)
         return mb == self.magic_bytes
 
     def _read_basic_header(self) -> None:
-        """
-        Read and save compression method, bitflags, changetime,
-        compression speed and os.
-        """
+        """Parse gzip header fields (method, flags, time, compression, OS)."""
         self.file_in.seek(2)
         vals = struct.unpack("<BBLBB", self.file_in.read(8))
         self.cm = vals[0]
@@ -113,9 +81,7 @@ class GzipReader:
         self.os = vals[4]
 
     def _read_until_zero(self) -> bytes:
-        """
-        Read input until \x00 is reached
-        """
+        """Read bytes until null terminator is encountered."""
         buf = b""
         c = self.file_in.read(1)
         while c != b"\x00":
@@ -124,13 +90,11 @@ class GzipReader:
         return buf
 
     def _read_index(self) -> None:
-        """
-        Read and save offset dict from indexed gzip file
-        """
+        """Parse and cache offset dictionary from gzip file comment field."""
         self.file_in.seek(10)
         mb = self.file_in.read(3)
-        if mb != b"FU\x01":  # All hail MK!
-            print("No index in comment field found. No random access possible")
+        if mb != b"FU\x01":
+            print("[Warning] No index in comment field found. Random access disabled.")
             self.indexed = False
             return
 
@@ -153,21 +117,11 @@ class GzipReader:
         self.file_in.seek(0)
 
     def read(self, size: int = -1) -> bytes:
-        """
-        Read the content of the in File in binary mode
-
-        Keyword Arguments:
-            size (int, optional): number of bytes to read, -1 for everything
-
-        Returns:
-            data (bytes): parsed bytes from input file
-        """
+        """Read bytes from file. Default (-1) reads entire file."""
         return self.file_in.read(size)
 
     def __enter__(self) -> "GzipReader":
-        """
-        Enable the with syntax for this class (entry point)
-        """
+        """Context manager entry."""
         return self
 
     def __exit__(
@@ -176,17 +130,9 @@ class GzipReader:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        """
-        destructor when using this class with 'with .. as '
-        """
+        """Context manager exit."""
         self.file_in.close()
 
     def close(self) -> None:
-        """
-        Close the internal Filehandler
-        """
+        """Close file handler."""
         self.file_in.close()
-
-
-if __name__ == "__main__":
-    print(__doc__)

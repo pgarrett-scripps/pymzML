@@ -11,7 +11,6 @@ sys.path.append(os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 
 import unittest
 import pymzml.run as run
-from pymzml.chromatogram import Chromatogram
 import test_file_paths
 
 
@@ -26,7 +25,7 @@ class ChromatogramPropertiesTest(unittest.TestCase):
 
         # Use a file with chromatograms for testing
         # mini.chrom.mzML is at index 3
-        for i, path in enumerate(self.paths):
+        for path in self.paths:
             if (
                 "mini.chrom.mzML" in path
                 and not path.endswith(".gz")

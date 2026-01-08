@@ -1,8 +1,7 @@
 import sqlite3
-from typing import Union
 import xml.etree.ElementTree as et
-from pymzml import spec
-from pymzml import chromatogram
+
+from pymzml import chromatogram, spec
 from pymzml.run import Reader
 
 
@@ -19,28 +18,14 @@ def create_database_from_file(db_name: str, file_path: str):
 
 
 class SQLiteDatabase:
-    """
-    Example implementation of a database Connector,
-    which can be used to make :py:func:`pymzml.run.Reader` accept paths to
-    sqlite db files.
-
-    We initialize with a path to a database and implement
-    a custom __getitem__ function to retrieve the spectra
-    """
+    """Database connector for accessing spectra stored in SQLite."""
 
     def __init__(self, path: str):
-        """ """
         connection = sqlite3.connect(path)
         self.cursor = connection.cursor()
 
     def __getitem__(self, key: str | int) -> spec.Spectrum | chromatogram.Chromatogram:
-        """
-        Execute a SQL request, process the data and return a spectrum object.
-
-        Args:
-            key (str or int): unique identifier for the given spectrum in the
-            database
-        """
+        """Query database for spectrum/chromatogram and return as object."""
         self.cursor.execute("SELECT * FROM spectra WHERE id=?", (key,))
         _, element = self.cursor.fetchone()
 

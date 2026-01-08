@@ -3,8 +3,8 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "pymzml"
-version = "2.5.8"
+name = "pymzml-turbo"
+version = "1.0.0"
 description = "high-throughput mzML parsing"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -16,7 +16,8 @@ authors = [
     { name = "K. Sugimoto" },
     { name = "R. Zahedi" },
     { name = "M. Hippler" },
-    { name = "C. Fufezan", email = "christian@fufezan.net" }
+    { name = "C. Fufezan", email = "christian@fufezan.net" },
+    { name = "Patrick Garrett", email = "pgarrett@scripps.edu" },
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -30,10 +31,10 @@ classifiers = [
     "Operating System :: POSIX",
     "Operating System :: Unix",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
     "Topic :: Scientific/Engineering :: Chemistry",
     "Topic :: Scientific/Engineering :: Medical Science Apps.",
@@ -45,11 +46,6 @@ dependencies = [
 [project.optional-dependencies]
 numpress = ["pynumpress>=0.0.4"]
 deconv = ["ms_deisotope>=0.0.14"]
-docs = [
-    "sphinx>=7.0",
-    "sphinx-rtd-theme>=2.0",
-    "numpydoc>=1.6.0",
-]
 test = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
@@ -60,10 +56,6 @@ dev = [
     "pytest-cov>=4.0",
     "coverage>=7.0",
     "ruff>=0.1.0",
-    "pre-commit>=3.0",
-    "sphinx>=7.0",
-    "sphinx-rtd-theme>=2.0",
-    "numpydoc>=1.6.0",
     "pynumpress>=0.0.4",
     "ms_deisotope>=0.0.14",
     "ty>=0.0.9",
@@ -76,8 +68,11 @@ Documentation = "https://pymzml.readthedocs.io"
 Repository = "https://github.com/pymzml/pymzml"
 Issues = "https://github.com/pymzml/pymzml/issues"
 
+[tool.hatch.build.targets.wheel]
+packages = ["pymzml"]
+
 [tool.ruff]
-target-version = "py39"
+target-version = "py311"
 line-length = 100
 
 [tool.ruff.lint]

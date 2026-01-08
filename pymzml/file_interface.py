@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
-"""
-Interface for mzML files
-
-@author: Manuel Koesters
-"""
-from pathlib import Path
+"""Interface for different mzML file formats."""
 
 from io import BytesIO
-from typing import Any
+from pathlib import Path
 from re import Pattern
-from pymzml.file_classes import indexedGzip, standardGzip, standardMzml, bytesMzml
+from typing import Any
+
+from pymzml.file_classes import bytesMzml, indexedGzip, standardGzip, standardMzml
 from pymzml.utils import gzip_reader
 
 
@@ -23,16 +20,7 @@ class FileInterface:
         build_index_from_scratch: bool = False,
         index_regex: Pattern[bytes] | None = None,
     ) -> None:
-        """
-        Initialize a object interface to mzML files.
-
-        Arguments:
-            path (Union[str, BytesIO]): path to the mzML file or BytesIO object
-            encoding (str)             : encoding of the file
-            build_index_from_scratch (bool): whether to build the index from scratch or use existing one
-            index_regex (Pattern[bytes] | None): regex pattern to find index entries
-
-        """
+        """Initialize FileInterface with path and encoding options."""
         self.build_index_from_scratch: bool = build_index_from_scratch
         self.encoding: str = encoding
         self.index_regex: Pattern[bytes] | None = index_regex
@@ -56,19 +44,7 @@ class FileInterface:
         | indexedGzip.IndexedGzip
         | bytesMzml.BytesMzml
     ):
-        """
-        Open a file like object resp. a wrapper for a file like object.
-
-        Arguments:
-            path_or_file (str | BytesIO): path to the mzml file or file object
-
-        Returns:
-            file_handler: instance of
-            :py:class:`~pymzml.file_classes.standardGzip.StandardGzip`,
-            :py:class:`~pymzml.file_classes.indexedGzip.IndexedGzip` or
-            :py:class:`~pymzml.file_classes.standardMzml.StandardMzml`,
-            based on the file ending of 'path'
-        """
+        """Open appropriate file handler based on file type and format."""
         if isinstance(path_or_file, BytesIO):
             return bytesMzml.BytesMzml(path_or_file, self.encoding, self.build_index_from_scratch)
         if isinstance(path_or_file, Path):
@@ -86,40 +62,31 @@ class FileInterface:
         )
 
     def _indexed_gzip(self, path: str) -> bool:
-        """
-        Check if the given file is an indexed gzip file or not.
-
-        Arguments:
-            path (str): path to the file
-
-        Returns:
-            bool : `True` if path is a gzip file with index, else `False`
-        """
+        """Check if file is an indexed gzip file."""
         indexed = False
         indexed = gzip_reader.GzipReader(path).indexed
         return indexed
 
     def read(self, size: int = -1) -> bytes | str:
-        """
-        Read binary data from file handler.
-
-        Keyword Arguments:
-            size (int): Number of bytes to read from file, -1 to
-            read to end of file
-
-        Returns:
-            data (Union[bytes, str]): byte string with defined size of the input data
-        """
+        """Read binary data from file handler (size=-1 reads to end)."""
         return self.file_handler.read(size)
 
+    def get_spectrum_by_id(self, spectrum_id: int | str) -> Any:
+        """Get spectrum by its native ID."""
+        return self.file_handler.get_spectrum_by_id(spectrum_id)
+
+    def get_spectrum_by_index(self, index: int) -> Any:
+        """Get spectrum by 0-based index."""
+        return self.file_handler.get_spectrum_by_index(index)
+
+    def get_chromatogram_by_id(self, chromatogram_id: str) -> Any:
+        """Get chromatogram by its native ID."""
+        return self.file_handler.get_chromatogram_by_id(chromatogram_id)
+
+    def get_chromatogram_by_index(self, index: int) -> Any:
+        """Get chromatogram by 0-based index."""
+        return self.file_handler.get_chromatogram_by_index(index)
+
     def __getitem__(self, identifier: str | int) -> Any:
-        """
-        Access the item with id 'identifier' in the file.
-
-        Arguments:
-            identifier (str): native id of the item to access
-
-        Returns:
-            data (str): text associated with the given identifier
-        """
+        """Access item by native ID or index."""
         return self.file_handler[identifier]

@@ -3,7 +3,6 @@
 Part of pymzml test cases
 """
 
-import os
 from pymzml.file_classes.standardMzml import StandardMzml
 import unittest
 from pymzml.spec import Spectrum
@@ -25,20 +24,20 @@ class StandardMzmlTest(unittest.TestCase):
 
     def test_getitem(self):
         """ """
-        ID = 8
-        spec = self.standard_mzml[ID]
+        id = 8
+        spec = self.standard_mzml[id]
         self.assertIsInstance(spec, Spectrum)
-        target_ID = spec.ID
-        self.assertEqual(ID, target_ID)
+        target_ID = spec.ID # type: ignore
+        self.assertEqual(id, target_ID)
 
-        ID = "TIC"
-        chrom = self.standard_mzml[ID]
+        id = "TIC"
+        chrom = self.standard_mzml[id]
         self.assertIsInstance(chrom, Chromatogram)
-        self.assertEqual(ID, chrom.ID)
+        self.assertEqual(id, chrom.ID) # type: ignore
 
     def test_interpol_search(self):
         """ """
-        spec = self.standard_mzml._interpol_search(5)
+        spec = self.standard_mzml._interpol_search(5) # type: ignore
         self.assertIsInstance(spec, Spectrum)
 
 
