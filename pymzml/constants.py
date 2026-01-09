@@ -34,14 +34,15 @@ class TimeUnit(StrEnum):
     HOUR = "hour"
 
 
-class BinaryDataType(StrEnum):
-    """Enumeration of binary data types for mzML encoding."""
+class BinaryDataTypeAccession(StrEnum):
+    """Enumeration of binary data type accessions."""
 
-    FLOAT_32 = "32-bit float"
-    FLOAT_64 = "64-bit float"
-    INT_32 = "32-bit integer"
-    INT_64 = "64-bit integer"
-    ASCII_STRING = "null-terminated ASCII string"
+    FLOAT_32 = "MS:1000521"  # 32-bit precision little-endian floating point (IEEE-754)
+    FLOAT_64 = "MS:1000523"  # 64-bit precision little-endian floating point (IEEE-754)
+    INT_32 = "MS:1000519"  # Signed 32-bit little-endian integer
+    INT_64 = "MS:1000522"  # Signed 64-bit little-endian integer
+    # MS:1000520 (16-bit float) is obsolete and not included
+    ASCII_STRING = "MS:1001479"  # null-terminated ASCII string
 
 
 class CompressionType(StrEnum):
@@ -198,10 +199,10 @@ NUMPRESS_COMPRESSIONS = frozenset(
 
 # Data type to numpy dtype mapping
 BINARY_DECODE_DTYPES = {
-    BinaryDataType.FLOAT_32: "float32",
-    BinaryDataType.FLOAT_64: "float64",
-    BinaryDataType.INT_32: "int32",
-    BinaryDataType.INT_64: "int64",
+    BinaryDataTypeAccession.FLOAT_32: "float32",
+    BinaryDataTypeAccession.FLOAT_64: "float64",
+    BinaryDataTypeAccession.INT_32: "int32",
+    BinaryDataTypeAccession.INT_64: "int64",
 }
 
 

@@ -18,9 +18,9 @@ class ChromatogramTest(unittest.TestCase):
     def setUp(self):
         self.paths = test_file_paths.paths
         path = self.paths[2]
-        self.Run_np = run.Reader(path)
-        self.chrom = self.Run_np["TIC"]
-
+        self.run_np = run.Reader(path)
+        self.chrom = self.run_np.TIC
+        
     def test_i(self):
         self.chrom.profile = [(1, 10), (2, 20), (3, 30)]
         peaks = self.chrom.peaks()

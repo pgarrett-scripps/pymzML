@@ -3,12 +3,10 @@
 Part of pymzml test cases
 """
 
-from pymzml.file_classes.standardMzml import StandardMzml
 import unittest
-from pymzml.spec import Spectrum
-from pymzml.chromatogram import Chromatogram
 import test_file_paths
 
+import pymzml as pmz
 
 class StandardMzmlTest(unittest.TestCase):
     """ """
@@ -16,7 +14,7 @@ class StandardMzmlTest(unittest.TestCase):
     def setUp(self):
         """ """
         paths = test_file_paths.paths
-        self.standard_mzml = StandardMzml(paths[0], "latin-1")
+        self.standard_mzml = pmz.StandardMzml(paths[0], "latin-1")
 
     def tearDown(self):
         """ """
@@ -25,20 +23,14 @@ class StandardMzmlTest(unittest.TestCase):
     def test_getitem(self):
         """ """
         id = 8
-        spec = self.standard_mzml[id]
-        self.assertIsInstance(spec, Spectrum)
-        target_ID = spec.ID # type: ignore
-        self.assertEqual(id, target_ID)
+        spec = self.standard_mzml.get_spectrum_by_index(id)
+        self.assertIsInstance(spec, pmz.MzmlXMLElement)
+        self.assertEqual(spec.element_type, pmz.ElementType.SPECTRUM)
 
-        id = "TIC"
-        chrom = self.standard_mzml[id]
-        self.assertIsInstance(chrom, Chromatogram)
-        self.assertEqual(id, chrom.ID) # type: ignore
+        chrom = self.standard_mzml.TIC
+        self.assertIsInstance(chrom, pmz.MzmlXMLElement)
+        self.assertEqual(chrom.element_type, pmz.ElementType.CHROMATOGRAM)
 
-    def test_interpol_search(self):
-        """ """
-        spec = self.standard_mzml._interpol_search(5) # type: ignore
-        self.assertIsInstance(spec, Spectrum)
 
 
 if __name__ == "__main__":

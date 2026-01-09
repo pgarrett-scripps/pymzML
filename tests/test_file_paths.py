@@ -1,4 +1,5 @@
 import os
+from enum import StrEnum
 
 DATA_FOLDER = os.path.join(
     *[
@@ -8,19 +9,23 @@ DATA_FOLDER = os.path.join(
     ]
 )
 
-DATA_FILES = [
-    "example.mzML",
-    "example.mzML.gz",
-    "example.mzML.idx.gz",
-    "mini.chrom.mzML",
-    "mini.chrom.mzML.gz",
-    "mini.chrom.mzML.idx.gz",
-    "mini_numpress.chrom.mzML",
-    "mini_numpress.chrom.mzML.gz",
-    "mini_numpress.chrom.mzML.idx.gz",
-    "BSA1.mzML.gz",
-    "example_invalid_obo_version.mzML",
-    "example_no_obo_version.mzML",
-]
 
-paths = [os.path.join(DATA_FOLDER, file) for file in DATA_FILES]
+class DataFiles(StrEnum):
+    EXAMPLE = "example.mzML"
+    EXAMPLE_GZ = "example.mzML.gz"
+    EXAMPLE_IDX_GZ = "example.mzML.idx.gz"
+    MINI_CHROM = "mini.chrom.mzML"
+    MINI_CHROM_GZ = "mini.chrom.mzML.gz"
+    MINI_CHROM_IDX_GZ = "mini.chrom.mzML.idx.gz"
+    MINI_NUMPRESS_CHROM = "mini_numpress.chrom.mzML"
+    MINI_NUMPRESS_CHROM_GZ = "mini_numpress.chrom.mzML.gz"
+    MINI_NUMPRESS_CHROM_IDX_GZ = "mini_numpress.chrom.mzML.idx.gz"
+    BSA1_GZ = "BSA1.mzML.gz"
+    EXAMPLE_INVALID_OBO_VERSION = "example_invalid_obo_version.mzML"
+    EXAMPLE_NO_OBO_VERSION = "example_no_obo_version.mzML"
+
+def get_data_file_paths(file: DataFiles) -> str:
+    return os.path.join(DATA_FOLDER, file.value)
+
+
+paths = [get_data_file_paths(file) for file in DataFiles]

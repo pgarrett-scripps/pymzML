@@ -4,9 +4,8 @@ import re
 from re import Pattern
 
 SPECTRUM_INDEX_PATTERN: Pattern[bytes] = re.compile(
-    b'(?P<type>(scan=|nativeID="))(?P<nativeID>[0-9]*)">"(?P<offset>[0-9]*)</offset>'
+    b'<offset idRef="[^"]*(?:scan=|nativeID=)(?P<nativeID>[0-9]+)[^"]*">(?P<offset>[0-9]+)</offset>'
 )
-
 SIM_INDEX_PATTERN: Pattern[bytes] = re.compile(
     b'(?P<type>idRef=")(?P<nativeID>.*)">(?P<offset>[0-9]*)</offset>'
 )

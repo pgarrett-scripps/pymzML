@@ -3,8 +3,8 @@ import gzip
 from collections import OrderedDict
 from xml.etree.ElementTree import XML
 
-from .. import chromatogram, spec
 from ..utils.gzip_reader import GzipReader
+from .xml_tuple import ElementType, MzmlXMLElement
 
 
 class IndexedGzip:
@@ -13,7 +13,13 @@ class IndexedGzip:
     def __init__(self, path: str, encoding: str) -> None:
         self.path: str = path
         self.file_handler = codecs.getreader(encoding)(gzip.open(path))  # noqa: SIM115
-        self.offset_dict: OrderedDict[int | str, int] = OrderedDict()
+        #self._offset_dict: OrderedDict[int | str, int] = OrderedDict()
+                
+        self.spectrum_offsets: OrderedDict[str, int] = OrderedDict()
+        self.chromatogram_offsets: OrderedDict[str, int] = OrderedDict()
+        self._spectrum_keys: list[str] = []  # For fast O(1) index access
+        self._chromatogram_keys: list[str] = []  # For fast O(1) index access
+
         self._build_index()
 
     def __del__(self) -> None:
@@ -22,108 +28,110 @@ class IndexedGzip:
 
     def _build_index(self) -> None:
         self.Reader: GzipReader = GzipReader(self.path)
-        self.offset_dict: OrderedDict[int | str, int] = self.Reader.index
+        self._offset_dict: OrderedDict[int | str, int] = self.Reader.index
+        # Populate offset dictionaries and key lists - separate spectra and chromatograms
+        for key, offset in self._offset_dict.items():
+            # Chromatograms typically have string IDs like "TIC"
+            # Spectra typically have numeric IDs
+            if isinstance(key, str) and not key.isdigit():
+                self.chromatogram_offsets[key] = offset
+                self._chromatogram_keys.append(key)
+            else:
+                # Store string version in offsets dict, but keep original key for lookups
+                key_str = str(key)
+                self.spectrum_offsets[key_str] = offset
+                self._spectrum_keys.append(key)  # Keep original key type for read_block
+
+    @property
+    def offset_dict(self) -> dict[str | int, int]:
+        """Return offset dictionary (for backward compatibility)."""
+        return dict(self._offset_dict)
+    
+    @property
+    def combined_offsets(self) -> dict[str | int, int]:
+        """Return combined offset dictionary."""
+        return dict(self._offset_dict)
 
     def read(self, size: int = -1) -> str:
         return self.file_handler.read(size)
 
-    def get_spectrum_by_id(self, spectrum_id: int | str) -> spec.Spectrum:
-        """Retrieve spectrum by its native ID.
+    def get_file_handler(self, encoding: str) -> codecs.StreamReader:
+        """Return a fresh decompressed text file handler."""
+        return codecs.getreader(encoding)(gzip.open(self.path))  # noqa: SIM115
 
-        Raises:
-            KeyError: If spectrum ID is not found.
-        """
-        if spectrum_id not in self.offset_dict:
-            raise KeyError(f"Spectrum ID {spectrum_id} not found in file")
-
-        ns_prefix = (
-            '<mzML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation='
-            '"http://psi.hupo.org/ms/mzml http://psidev.info/files/ms/mzML/xsd/mzML1.1.0.xsd" id="test_Creinhardtii_QE_pH8"'
-            ' version="1.1.0" xmlns="http://psi.hupo.org/ms/mzml">'
-        )
-        ns_suffix = "</mzML>"
-        data = self.Reader.read_block(spectrum_id)
-        element = XML(ns_prefix + data.decode("utf-8") + ns_suffix)
-        if "chromatogram" in element[0].tag:
-            raise ValueError(f"ID {spectrum_id} refers to a chromatogram, not a spectrum")
-        return spec.Spectrum(list(element)[0], measured_precision=5e-6)
-
-    def get_spectrum_by_index(self, index: int) -> spec.Spectrum:
-        """Retrieve spectrum by 0-based index.
-
-        Raises:
-            IndexError: If index is out of range.
-        """
-        numeric_keys = [k for k in self.offset_dict if isinstance(k, int)]
-        if not (0 <= index < len(numeric_keys)):
-            raise IndexError(f"Index {index} out of range [0, {len(numeric_keys)})")
-        spectrum_id = numeric_keys[index]
-        return self.get_spectrum_by_id(spectrum_id)
-
-    def get_chromatogram_by_id(self, chromatogram_id: str) -> chromatogram.Chromatogram:
-        """Retrieve chromatogram by its native ID."""
-        # IndexedGzip generally indexes things by ID.
-        # However, the GzipReader index seems to assume integer IDs for spectra.
-        # String IDs (chromatograms) handling depends on GzipReader implementation.
-        # Assuming GzipReader can handle string keys if they were indexed.
-        
-        # NOTE: GzipReader in pymzml usually handles numeric spectrum IDs.
-        # Checking if it supports arbitrary string lookups for chromatograms.
-        if chromatogram_id not in self.offset_dict:
-             # Fallback: We might not have indexed chromatograms by string ID
-             raise KeyError(f"Chromatogram ID {chromatogram_id} not found in index")
-
+    def _get_element_by_key(
+        self, key: str | int, expected_type: ElementType | None = None
+    ) -> MzmlXMLElement:
+        """Internal method to retrieve element by key from indexed gzip."""
         ns_prefix = (
             '<mzML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation='
             '"http://psi.hupo.org/ms/mzml http://psidev.info/files/ms/mzML/xsd/mzML1.1.0.xsd" id="test_Creinhardtii_QE_pH8" '
             'version="1.1.0" xmlns="http://psi.hupo.org/ms/mzml">'
         )
         ns_suffix = "</mzML>"
-        data = self.Reader.read_block(chromatogram_id)
-        element = XML(ns_prefix + data.decode("utf-8") + ns_suffix)
-        if "chromatogram" not in element[0].tag:
-             raise ValueError(f"ID {chromatogram_id} refers to a spectrum, not a chromatogram")
-        return chromatogram.Chromatogram(list(element)[0], measured_precision=5e-6)
+        data = self.Reader.read_block(key)
+        root = XML(ns_prefix + data.decode("utf-8") + ns_suffix)
 
-    def get_chromatogram_by_index(self, index: int) -> chromatogram.Chromatogram:
-        """Retrieve chromatogram by 0-based index."""
-        chrom_keys = [k for k in self.offset_dict if isinstance(k, str) and k != "TIC"]
-        if not (0 <= index < len(chrom_keys)):
-            raise IndexError(f"Index {index} out of range [0, {len(chrom_keys)})")
-        chrom_id = chrom_keys[index]
-        return self.get_chromatogram_by_id(chrom_id)
+        # The parsed XML is the root mzML element, find the actual spectrum/chromatogram child
+        element = None
+        element_type: ElementType | None = None
+        for child in root:
+            if child.tag.endswith("}spectrum"):
+                element = child
+                element_type = ElementType.SPECTRUM
+                break
+            elif child.tag.endswith("}chromatogram"):
+                element = child
+                element_type = ElementType.CHROMATOGRAM
+                break
 
-    def __getitem__(self, identifier: int | str) -> spec.Spectrum | chromatogram.Chromatogram:
-        """Retrieve spectrum or chromatogram by ID or index.
+        if element is None or element_type is None:
+            raise ValueError(f"No spectrum or chromatogram found in XML for key {key}")
 
-        For integers: tries spectrum ID first, then falls back to 0-based index.
-        """
+        if expected_type is not None and element_type != expected_type:
+            raise ValueError(f"Expected {expected_type} but found {element_type}")
+
+        return MzmlXMLElement(element=element, element_type=element_type)
+
+    def get_spectrum_by_index(self, index: int) -> MzmlXMLElement:
+        """Retrieve spectrum by 0-based index."""
+        if not (0 <= index < len(self._spectrum_keys)):
+            raise IndexError(f"Spectrum index {index} out of range [0, {len(self._spectrum_keys)})")
+        key = self._spectrum_keys[index]
+        return self._get_element_by_key(key, expected_type=ElementType.SPECTRUM)
+
+    def get_spectrum_by_id(self, identifier: str | int) -> MzmlXMLElement:
+        """Retrieve spectrum by native ID."""
         if isinstance(identifier, int):
-            try:
-                return self.get_spectrum_by_id(identifier)
-            except KeyError:
-                # Not a valid spectrum ID - try 0-based index
-                try:
-                    return self.get_spectrum_by_index(identifier)
-                except IndexError:
-                    raise KeyError(f"Identifier {identifier} not found in file") from None
+            identifier = str(identifier)
+        if identifier not in self.spectrum_offsets:
+            raise KeyError(f"Spectrum ID {identifier} not found in index")
+        return self._get_element_by_key(identifier, expected_type=ElementType.SPECTRUM)
 
-        # String identifiers (chromatogram IDs)
-        # TODO: Use .register_namespace for more elegant XML namespace handling
-        ns_prefix = (
-            '<mzML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation='
-            '"http://psi.hupo.org/ms/mzml http://psidev.info/files/ms/mzML/xsd/mzML1.1.0.xsd" id="test_Creinhardtii_QE_pH8" '
-            'version="1.1.0" xmlns="http://psi.hupo.org/ms/mzml">'
-        )
-        ns_suffix = "</mzML>"
-        data = self.Reader.read_block(identifier)
-        element = XML(ns_prefix + data.decode("utf-8") + ns_suffix)
-        if "chromatogram" in element[0].tag:
-            return chromatogram.Chromatogram(list(element)[0], measured_precision=5e-6)
-        else:
-            return spec.Spectrum(list(element)[0], measured_precision=5e-6)
+    def get_chromatogram_by_index(self, index: int) -> MzmlXMLElement:
+        """Retrieve chromatogram by 0-based index."""
+        if not (0 <= index < len(self._chromatogram_keys)):
+            raise IndexError(
+                f"Chromatogram index {index} out of range [0, {len(self._chromatogram_keys)})"
+            )
+        key = self._chromatogram_keys[index]
+        return self._get_element_by_key(key, expected_type=ElementType.CHROMATOGRAM)
 
+    def get_chromatogram_by_id(self, identifier: str | int) -> MzmlXMLElement:
+        """Retrieve chromatogram by native ID."""
+        if isinstance(identifier, int):
+            identifier = str(identifier)
+        if identifier not in self.chromatogram_offsets:
+            raise KeyError(f"Chromatogram ID {identifier} not found in index")
+        return self._get_element_by_key(identifier, expected_type=ElementType.CHROMATOGRAM)
+
+        
     def close(self) -> None:
         """Close the handlers."""
         self.Reader.close()
         self.file_handler.close()
+
+    @property
+    def TIC(self) -> MzmlXMLElement:
+        """Retrieve the Total Ion Chromatogram (TIC)."""
+        return self.get_chromatogram_by_id("TIC")

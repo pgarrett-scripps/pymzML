@@ -1,14 +1,11 @@
-import bisect
-import contextlib
-import os
 import re
 from collections import OrderedDict
-from collections.abc import Iterator
-from re import Match, Pattern
+from re import Pattern
 from typing import BinaryIO, TextIO
-from xml.etree.ElementTree import XML, iterparse
+from xml.etree.ElementTree import XML
 
-from .. import chromatogram, regex_patterns, spec
+from .. import regex_patterns
+from .xml_tuple import ElementType, MzmlXMLElement
 
 
 class StandardMzml:
@@ -24,11 +21,12 @@ class StandardMzml:
         self.index_regex: Pattern[bytes] | None = index_regex
         self.path: str = path
         self.file_handler: TextIO = self.get_file_handler(encoding)
-        self.offset_dict: OrderedDict[int | str, int | tuple[int, ...] | None] = OrderedDict()
-        self.spec_open: Pattern[bytes] = regex_patterns.SPECTRUM_OPEN_PATTERN
-        self.spec_close: Pattern[bytes] = regex_patterns.SPECTRUM_CLOSE_PATTERN
 
-        self.seek_list: list[tuple[int, int]] = self._read_extremes()
+        self.spectrum_offsets: OrderedDict[str, int] = OrderedDict()
+        self.chromatogram_offsets: OrderedDict[str, int] = OrderedDict()
+        self._spectrum_keys: list[str] = []  # For fast O(1) index access
+        self._chromatogram_keys: list[str] = []  # For fast O(1) index access
+
         self._build_index(from_scratch=build_index_from_scratch)
 
     def get_binary_file_handler(self) -> BinaryIO:
@@ -37,246 +35,88 @@ class StandardMzml:
     def get_file_handler(self, encoding: str) -> TextIO:
         return open(self.path, encoding=encoding)
 
-    def get_spectrum_by_id(self, spectrum_id: int | str) -> spec.Spectrum:
+    def get_spectrum_by_id(self, identifier: str | int) -> MzmlXMLElement:
         """Retrieve spectrum by native ID.
 
-        Raises:
-            Exception: If spectrum ID is not found or out of range.
-        """
-        if isinstance(spectrum_id, int):
-            return self._binary_search(spectrum_id)
-        # Handle string ID
-        result = self._search_string_identifier(spectrum_id)
-        if isinstance(result, spec.Spectrum):
-            return result
-        raise KeyError(f"ID {spectrum_id} refers to a chromatogram, not a spectrum")
+        Args:
+            identifier: Spectrum ID (string) or integer.
 
-    def get_spectrum_by_index(self, index: int) -> spec.Spectrum:
+        Raises:
+            KeyError: If ID is not found.
+        """
+        if isinstance(identifier, int):
+            identifier = str(identifier)
+
+        if identifier not in self.spectrum_offsets:
+            raise KeyError(f"Spectrum ID {identifier} not found in index")
+
+        offset = self.spectrum_offsets[identifier]
+        seeker = self.get_binary_file_handler()
+        seeker.seek(offset)
+        _, end_pos = self._read_to_spec_end(seeker)
+        seeker.close()
+        self.file_handler.seek(offset, 0)
+        data = self.file_handler.read(end_pos - offset)
+
+        return MzmlXMLElement(XML(data), element_type=ElementType.SPECTRUM)
+
+    def get_spectrum_by_index(self, index: int) -> MzmlXMLElement:
         """Retrieve spectrum by 0-based index.
+
+        Args:
+            index: 0-based index in spectrum list.
 
         Raises:
             IndexError: If index is out of range.
         """
-        spectrum_ids = sorted([k for k in self.offset_dict if isinstance(k, int)])
+        if not (0 <= index < len(self._spectrum_keys)):
+            raise IndexError(f"Spectrum index {index} out of range [0, {len(self._spectrum_keys)})")
 
-        if not (0 <= index < len(spectrum_ids)):
-            raise IndexError(f"Index {index} out of range [0, {len(spectrum_ids)})")
+        key = self._spectrum_keys[index]
+        return self.get_spectrum_by_id(key)
 
-        spectrum_id = spectrum_ids[index]
-        return self._binary_search(spectrum_id)
+    def get_chromatogram_by_id(self, identifier: str | int) -> MzmlXMLElement:
+        """Retrieve chromatogram by native ID.
 
-    def get_chromatogram_by_id(self, chromatogram_id: str) -> chromatogram.Chromatogram:
-        """Retrieve chromatogram by native ID."""
-        # Check explicit strings supported in index
-        if chromatogram_id in self.offset_dict:
-            start_data = self.offset_dict[chromatogram_id]
-            if start_data is None:
-                raise KeyError(f"Chromatogram ID {chromatogram_id} found but has no offset")
-            start_offset = start_data[0] if isinstance(start_data, tuple) else start_data
+        Args:
+            identifier: Chromatogram ID (string) or integer.
 
-            seeker = self.get_binary_file_handler()
-            seeker.seek(start_offset)
-            start, end = self._read_to_spec_end(seeker)
-
-            self.file_handler.seek(start, 0)
-            data = self.file_handler.read(end)
-            if data.startswith("<chromatogram"):
-                return chromatogram.Chromatogram(XML(data))
-
-        # Fallback to string search if not in index or for special handling
-        result = self._search_string_identifier(chromatogram_id)
-        if isinstance(result, chromatogram.Chromatogram):
-            return result
-        raise KeyError(f"Chromatogram ID {chromatogram_id} not found or refers to a spectrum")
-
-    def get_chromatogram_by_index(self, index: int) -> chromatogram.Chromatogram:
-        """Retrieve chromatogram by 0-based index."""
-        chrom_ids = sorted([k for k in self.offset_dict if isinstance(k, str) and k != "TIC"])
-        # TIC is a special case often not in the main list or handled differently
-
-        if index < len(chrom_ids):
-            return self.get_chromatogram_by_id(chrom_ids[index])
-
-        # If not in offset dict (e.g. index wasn't fully built), try linear scan
-        # This is expensive but necessary if index is incomplete
-        self.file_handler.seek(0)
-        mzmliter = iterparse(self.file_handler, events=["end"])
-        current_idx = 0
-        for event, element in mzmliter:
-            if event == "end" and element.tag.endswith("}chromatogram"):
-                if current_idx == index:
-                    return chromatogram.Chromatogram(element, measured_precision=5e-6)
-                current_idx += 1
-        raise IndexError(f"Chromatogram index {index} out of range")
-
-    def __getitem__(
-        self, identifier: int | str
-    ) -> spec.Spectrum | chromatogram.Chromatogram | None:
-        """Retrieve spectrum or chromatogram by ID or index.
-
-        For integers: tries spectrum ID first, then falls back to 0-based index.
-        Supports special case 'TIC' for total ion current chromatogram.
+        Raises:
+            KeyError: If ID is not found.
         """
-        self.file_handler.seek(0)
+        if isinstance(identifier, int):
+            identifier = str(identifier)
 
-        spectrum: spec.Spectrum | chromatogram.Chromatogram | None = None
-        if str(identifier).upper() == "TIC":
-            mzmliter = iterparse(self.file_handler, events=["end"])
-            for event, element in mzmliter:
-                if (
-                    event == "end"
-                    and element.tag.endswith("}chromatogram")
-                    and element.get("id") == "TIC"
-                ):
-                    spectrum = chromatogram.Chromatogram(element, measured_precision=5e-6)
-                    break
+        if identifier not in self.chromatogram_offsets:
+            raise KeyError(f"Chromatogram ID {identifier} not found in index")
 
-        elif identifier in self.offset_dict:
-            start_data = self.offset_dict[identifier]
-            if start_data is None:
-                return None
-            start_offset = start_data[0] if isinstance(start_data, tuple) else start_data
+        offset = self.chromatogram_offsets[identifier]
+        seeker = self.get_binary_file_handler()
+        seeker.seek(offset)
+        _, end_pos = self._read_to_spec_end(seeker)
+        seeker.close()
+        self.file_handler.seek(offset, 0)
+        data = self.file_handler.read(end_pos - offset)
 
-            seeker = self.get_binary_file_handler()
-            seeker.seek(start_offset)
-            start, end = self._read_to_spec_end(seeker)
+        return MzmlXMLElement(XML(data), element_type=ElementType.CHROMATOGRAM)
 
-            self.file_handler.seek(start, 0)
-            data = self.file_handler.read(end)
-            if data.startswith("<spectrum"):
-                spectrum = spec.Spectrum(XML(data))
-            elif data.startswith("<chromatogram"):
-                spectrum = chromatogram.Chromatogram(XML(data))
-        elif isinstance(identifier, str):
-            return self._search_string_identifier(identifier)
-        else:  # int: try spectrum ID first, then 0-based index
-            try:
-                spectrum = self.get_spectrum_by_id(identifier)
-            except Exception as e:
-                try:
-                    spectrum = self.get_spectrum_by_index(identifier)  # type: ignore
-                except IndexError:
-                    raise e from None
+    def get_chromatogram_by_index(self, index: int) -> MzmlXMLElement:
+        """Retrieve chromatogram by 0-based index.
 
-        return spectrum
+        Args:
+            index: 0-based index in chromatogram list.
 
-    def _binary_search(self, target_index: int) -> spec.Spectrum:
-        """Retrieve spectrum by ID using adaptive binary searching with caching."""
-        chunk_size = 12800
-        offset_scale = 1
-        jump_history = {"forwards": 0, "backwards": 0}
+        Raises:
+            IndexError: If index is out of range.
+        """
+        try:
+            key = self._chromatogram_keys[index]
+        except IndexError as e:
+            raise IndexError(
+                f"Chromatogram index {index} out of range [0, {len(self._chromatogram_keys)})"
+            ) from e
+        return self.get_chromatogram_by_id(key)
 
-        with open(self.path, "rb") as seeker:
-            if target_index not in self.offset_dict:
-                for _ in range(40):
-                    scan: int | None = None
-                    # Cast to satisfy type checker - seek_list has compatible tuple structure
-                    insert_position = bisect.bisect_left(self.seek_list, (target_index, 0))  # type: ignore[arg-type]
-                    if target_index < self.seek_list[0][0] or target_index > self.seek_list[-1][0]:
-                        raise Exception(
-                            f"Spectrum ID should be between {self.seek_list[0][0]} and {self.seek_list[-1][0]}"
-                        )
-
-                    element_before = self.seek_list[insert_position - 1]
-                    spec_offset_m1 = target_index - element_before[0]
-
-                    element_after = self.seek_list[insert_position]
-                    spec_offset_p1 = element_after[0] - target_index
-
-                    byte_diff_m1_p1 = element_after[1] - element_before[1]
-                    scan_diff_m1_p1 = element_after[0] - element_before[0]
-
-                    average_spec_between_m1_p1 = int(round(byte_diff_m1_p1 / scan_diff_m1_p1))
-
-                    if spec_offset_m1 < spec_offset_p1:
-                        jump_direction = "forwards"
-                        jump_history["backwards"] = 0
-                        jump_history["forwards"] += 1
-                        byte_offset = element_before[1] + jump_history["forwards"] * (
-                            offset_scale * average_spec_between_m1_p1 * spec_offset_m1
-                        )
-                        if (target_index - element_before[0]) < 10:
-                            byte_offset = element_before[1]
-                    else:
-                        jump_direction = "backwards"
-                        jump_history["forwards"] = 0
-                        jump_history["backwards"] += 1
-                        byte_offset = element_after[1] - jump_history["backwards"] * (
-                            offset_scale * average_spec_between_m1_p1 * spec_offset_p1
-                        )
-
-                    byte_offset = int(byte_offset)
-                    found_scan = False
-                    chunk = b""
-                    break_outer = False
-
-                    for x in range(100):
-                        seeker.seek(max([os.SEEK_SET + byte_offset + x * chunk_size, 1]))
-                        chunk += seeker.read(chunk_size)
-
-                    matches: Iterator[Match[bytes]] = re.finditer(
-                        regex_patterns.SPECTRUM_OPEN_PATTERN, chunk
-                    )
-                    for _, match in enumerate(matches):
-                        spec_info = match.groups()
-                        spec_info_dict = dict(
-                            zip(spec_info[0::2], spec_info[1::2], strict=False)
-                        )
-                        id_match = re.search(b"[0-9]*$", spec_info_dict[b"id"])
-                        if id_match:
-                            scan = int(id_match.group())
-
-                        if jump_direction == "forwards":
-                            if scan is not None and scan > target_index:
-                                offset_scale = 0.1
-                                jump_history["forwards"] = 0
-                            else:
-                                offset_scale = 1
-                        if jump_direction == "backwards":
-                            if scan is not None and scan < target_index:
-                                offset_scale = 0.1
-                                jump_history["backwards"] = 0
-                            else:
-                                offset_scale = 1
-
-                        if scan in self.offset_dict:
-                            continue
-                        found_scan = True
-                        if scan is not None:
-                            new_entry = (
-                                scan,
-                                byte_offset + match.start(),
-                            )
-                            new_pos = bisect.bisect_left(self.seek_list, new_entry)
-                            self.seek_list.insert(new_pos, new_entry)
-                            self.offset_dict[scan] = (byte_offset + match.start(),)
-                            if scan == target_index:
-                                break_outer = True
-                                break
-                    if break_outer:
-                        break
-                    if found_scan:
-                        offset_scale = 1
-                    else:
-                        offset_scale += 1
-                    if target_index in self.offset_dict:
-                        break
-
-            start_data = self.offset_dict[target_index]
-            if start_data is None:
-                raise Exception(f"No offset found for spectrum {target_index}")
-            start_offset = start_data[0] if isinstance(start_data, tuple) else start_data
-
-            seeker.seek(start_offset)
-            data = b""
-            while b"</spectrum>" not in data:
-                data += seeker.read(chunk_size)
-            end = data.find(b"</spectrum>")
-            seeker.seek(start_offset)
-            spec_string = seeker.read(end + len("</spectrum>"))
-            spec_string_decoded = spec_string.decode("utf-8")
-            spectrum = spec.Spectrum(XML(spec_string_decoded))
-            return spectrum
 
     def _build_index(self, from_scratch: bool = False) -> None:
         """Build index of spectrum/chromatogram offsets from file.
@@ -284,90 +124,59 @@ class StandardMzml:
         Reads index from file footer if available, otherwise parses entire file.
         """
         seeker = self.get_binary_file_handler()
-        self.offset_dict["TIC"] = None
+
+        # Find indexListOffset in file footer (last 10KB)
         seeker.seek(0, 2)
-        index_found = False
-        index_list_offset = None
-        spectrum_index_pattern: Pattern[bytes] = regex_patterns.SPECTRUM_INDEX_PATTERN
-        for _ in range(1, 10):  # max 10KB buffer
-            sanity_check_set: set[int] = set()
-            with contextlib.suppress(Exception):
-                seeker.seek(-1024 * _, 1)
-            for line in seeker:
-                match = regex_patterns.CHROMATOGRAM_OFFSET_PATTERN.search(line)
-                if match:
-                    self.offset_dict["TIC"] = int(bytes.decode(match.group("offset")))
+        file_size = seeker.tell()
+        search_start = max(0, file_size - 10240)  # Last 10KB
+        seeker.seek(search_start)
+        footer_data = seeker.read()
 
-                match_spec = spectrum_index_pattern.search(line)
-                if match_spec is not None:
-                    spec_byte_offset = int(bytes.decode(match_spec.group("offset")))
-                    sanity_check_set.add(spec_byte_offset)
+        # Look for <indexListOffset>...</indexListOffset>
+        index_offset_match = regex_patterns.INDEX_LIST_OFFSET_PATTERN.search(footer_data)
 
-                match = regex_patterns.INDEX_LIST_OFFSET_PATTERN.search(line)
-                if match:
-                    index_found = True
-                    index_list_offset = int(match.group("indexListOffset").decode("utf-8"))
-
-            if index_found is True and self.offset_dict["TIC"] is not None:
-                break
-
-        if index_found is True:
-            if index_list_offset is None:
-                raise Exception("Index list offset not found although index found")
+        if index_offset_match:
+            index_list_offset = int(index_offset_match.group("indexListOffset").decode("utf-8"))
             seeker.seek(index_list_offset, 0)
-            spectrum_index_pattern: Pattern[bytes] = regex_patterns.SPECTRUM_INDEX_PATTERN
-            sim_index_pattern: Pattern[bytes] = regex_patterns.SIM_INDEX_PATTERN
+
+            # Read index section - parse XML structure
+            current_index_type = None
+            offset_pattern = re.compile(rb'<offset idRef="([^"]*)"[^>]*>(\d+)</offset>')
+            index_name_pattern = re.compile(rb'<index name="([^"]*)">')
 
             for line in seeker:
-                match_spec = spectrum_index_pattern.search(line)
-                if match_spec and match_spec.group("nativeID") == b"":
-                    match_spec = None
-                match_sim = sim_index_pattern.search(line)
-                if self.index_regex is None:
-                    if match_spec:
-                        offset = int(bytes.decode(match_spec.group("offset")))
-                        native_id = int(bytes.decode(match_spec.group("nativeID")))
-                        self.offset_dict[native_id] = offset
-                    elif match_sim:
-                        offset = int(bytes.decode(match_sim.group("offset")))
-                        native_id = bytes.decode(match_sim.group("nativeID"))
-                        try:
-                            id_match = regex_patterns.SPECTRUM_ID_PATTERN2.search(native_id)
-                            if id_match:
-                                native_id = int(id_match.group(2))
-                        except (AttributeError, ValueError):
-                            # match is None and has no attribute group,
-                            # so use the whole string as ID
-                            pass
-                        self.offset_dict[native_id] = (offset,)
-                else:
-                    match: Match[bytes] | None = self.index_regex.search(line)
-                    if match:
-                        native_id_raw = match.group("ID")
-                        native_id: int | str
-                        try:
-                            native_id = int(native_id_raw)
-                        except (ValueError, TypeError):
-                            native_id = (
-                                native_id_raw.decode()
-                                if isinstance(native_id_raw, bytes)
-                                else str(native_id_raw)
-                            )
-                        offset_bytes = match.group("offset")
-                        # Decode bytes to string first, then convert to int
-                        offset_str = (
-                            offset_bytes.decode()
-                            if isinstance(offset_bytes, bytes)
-                            else str(offset_bytes)
-                        )
-                        offset = int(offset_str)
-                        self.offset_dict[native_id] = (offset,)
+                # Check if we're entering a new index section
+                name_match = index_name_pattern.search(line)
+                if name_match:
+                    current_index_type = name_match.group(1).decode("utf-8")
+                    continue
 
-        elif from_scratch is True:
+                # Parse offset entries
+                offset_match = offset_pattern.search(line)
+                if offset_match and current_index_type:
+                    native_id = offset_match.group(1).decode("utf-8")
+                    offset = int(offset_match.group(2).decode("utf-8"))
+
+                    if current_index_type == "spectrum":
+                        self.spectrum_offsets[native_id] = offset
+                    elif current_index_type == "chromatogram":
+                        self.chromatogram_offsets[native_id] = offset
+
+                # Stop at end of indexList
+                if b"</indexList>" in line:
+                    break
+
+            # Build keys lists for fast index access
+            self._spectrum_keys = list(self.spectrum_offsets.keys())
+            self._chromatogram_keys = list(self.chromatogram_offsets.keys())
+
+        else:
+            # No index found - build from scratch regardless of flag
+            # This is necessary for random access to work
+            if not from_scratch:
+                print("[Warning] No index found, building from scratch for random access support")
             seeker.seek(0)
             self._build_index_from_scratch(seeker)
-        else:
-            print("[Warning] Not index found and build_index_from_scratch is False")
 
         seeker.close()
 
@@ -376,13 +185,17 @@ class StandardMzml:
 
         def get_data_indices(
             fh: BinaryIO, chunksize: int = 8192, lookback_size: int = 100
-        ) -> dict[str, int]:
+        ) -> tuple[dict[str, int], dict[str, int]]:
             """Find binary offsets of all spectra and chromatograms.
 
             Uses regex instead of XML parser to capture exact file positions.
+
+            Returns:
+                Tuple of (chrom_positions, spec_positions) dictionaries.
             """
             chrom_positions: dict[str, int] = {}
             spec_positions: dict[str, int] = {}
+
             chromcnt = 0
             speccnt = 0
             chromexp: Pattern[bytes] = re.compile(b'<\\s*chromatogram[^>]*id="([^"]*)"')
@@ -404,9 +217,14 @@ class StandardMzml:
                 prev_chunk = chunk
 
                 for m in chromexp.finditer(chunk):
-                    chrom_positions[m.group(1).decode("utf-8")] = offset + m.start()
+                    key = m.group(1).decode("utf-8")
+                    value = offset + m.start()
+                    chrom_positions[key] = value
+
                 for m in specexp.finditer(chunk):
-                    spec_positions[m.group(1).decode("utf-8")] = offset + m.start()
+                    key = m.group(1).decode("utf-8")
+                    value = offset + m.start()
+                    spec_positions[key] = value
 
                 m = chromcntexp.search(chunk)
                 if m is not None:
@@ -415,11 +233,7 @@ class StandardMzml:
                 if m is not None:
                     speccnt = int(m.group(1))
 
-            if chromcnt == len(chrom_positions) and speccnt == len(spec_positions):
-                positions: dict[str, int] = {}
-                positions.update(chrom_positions)
-                positions.update(spec_positions)
-            else:
+            if chromcnt != len(chrom_positions) or speccnt != len(spec_positions):
                 print(
                     f"[Warning] Found {len(spec_positions)} spectra and "
                     f"{len(chrom_positions)} chromatograms; "
@@ -428,128 +242,18 @@ class StandardMzml:
                 print(
                     "[Warning] Using found offsets but some may be missing. File may be truncated."
                 )
-                positions: dict[str, int] = {}
-                positions.update(chrom_positions)
-                positions.update(spec_positions)
-            return positions
 
-        indices: dict[str, int] = get_data_indices(seeker)
-        tmp_dict: OrderedDict[str, tuple[int, ...]] = OrderedDict()
+            return chrom_positions, spec_positions
 
-        item_list: list[tuple[str, int]] = sorted(indices.items(), key=lambda x: x[1])
-        for i in range(len(item_list)):
-            key = item_list[i][0]
-            tmp_dict[key] = (item_list[i][1],)
+        chrom_positions, spec_positions = get_data_indices(seeker)
 
-        self.offset_dict.update(tmp_dict)
+        # Update separate offset dictionaries
+        self.chromatogram_offsets.update(chrom_positions)
+        self.spectrum_offsets.update(spec_positions)
 
-    def _interpol_search(
-        self, target_index: int, chunk_size: int = 8, fallback_cutoff: int = 100
-    ) -> spec.Spectrum | None:
-        """Locate spectrum using interpolation search with linear fallback."""
-        seeker: BinaryIO = self.get_binary_file_handler()
-        seeker.seek(0, 2)
-        chunk_size = chunk_size * 512
-        upper_bound = seeker.tell()
-        mid = int(upper_bound / 2)
-        seeker.seek(mid, 0)
-        current_position = seeker.tell()
-        used_indices: set[int] = set()
-        spectrum_found = False
-        spectrum = None
-        while spectrum_found is False:
-            jumper_scaling = 1
-            file_pointer = seeker.tell()
-            data = seeker.read(chunk_size)
-            spec_start = self.spec_open.search(data)
-            if spec_start is not None:
-                spec_start_offset = file_pointer + spec_start.start()
-                seeker.seek(spec_start_offset)
-                spec_info = spec_start.groups()
-                spec_info = dict(zip(spec_info[0::2], spec_info[1::2], strict=False))
-                id_match = re.search(b"[0-9]*$", spec_info[b"id"])
-                if not id_match:
-                    continue
-                current_index = int(id_match.group())
-
-                self.offset_dict[current_index] = (spec_start_offset,)
-                if current_index in used_indices:
-                    if current_index > target_index:
-                        jumper_scaling -= 0.1
-                    else:
-                        jumper_scaling += 0.1
-
-                used_indices.add(current_index)
-
-                dist = current_index - target_index
-                if dist < -1 and dist > -(fallback_cutoff):
-                    spectrum = self._search_linear(seeker, target_index)
-                    spectrum_found = True
-                    break
-                elif dist > 0 and dist < fallback_cutoff:
-                    while current_index > target_index:
-                        offset = int(current_position - chunk_size)
-                        seeker.seek(offset if offset > 0 else 0)
-                        current_position = seeker.tell()
-                        data = seeker.read(chunk_size)
-                        spec_match = self.spec_open.search(data)
-                        if spec_match:
-                            spec_info = spec_match.groups()
-                            spec_info = dict(
-                                zip(spec_info[0::2], spec_info[1::2], strict=False)
-                            )
-                            id_match = re.search(b"[0-9]*$", spec_info[b"id"])
-                            if id_match:
-                                current_index = int(id_match.group())
-                    seeker.seek(current_position)
-                    spectrum = self._search_linear(seeker, target_index)
-                    spectrum_found = True
-                    break
-
-                if int(current_index) == target_index:
-                    seeker.seek(spec_start_offset)
-                    start, end = self._read_to_spec_end(seeker)
-                    seeker.seek(start)
-                    self.offset_dict[current_index] = (start, end)
-                    xml_string = seeker.read(end - start)
-                    spectrum = spec.Spectrum(XML(xml_string))
-                    spectrum_found = True
-                    break
-
-                elif int(current_index) > target_index:
-                    scaling = target_index / current_index
-                    seeker.seek(int(current_position * scaling * jumper_scaling))
-                    upper_bound = current_position
-                    current_position = seeker.tell()
-                elif int(current_index) < target_index:
-                    scaling = target_index / current_index
-                    seeker.seek(int(current_position * scaling * jumper_scaling))
-                    current_position = seeker.tell()
-
-            elif len(data) == 0:
-                sorted_int_keys = {k: v for k, v in self.offset_dict.items() if isinstance(k, int)}
-                sorted_keys = sorted(sorted_int_keys.keys())
-                pos = bisect.bisect_left(sorted_keys, target_index) - 2  # dat magic number :)
-                try:
-                    key = sorted_keys[pos]
-                    offset_data = self.offset_dict[key]
-                    if offset_data is None or isinstance(offset_data, int):
-                        raise Exception(f"Invalid offset data for key {key}")
-                    spec_start_offset = offset_data[0]
-                except Exception:
-                    key = sorted_keys[pos]
-                    offset_data = self.offset_dict[key]
-                    if offset_data is None or isinstance(offset_data, int):
-                        raise Exception(f"Invalid offset data for key {key}") from None
-                    spec_start_offset = offset_data[0]
-                seeker = self.get_binary_file_handler()
-                seeker.seek(spec_start_offset)
-                spectrum = self._search_linear(seeker, target_index)
-                # seeker.close()
-                spectrum_found = True
-                break
-
-        return spectrum
+        # Build keys lists for fast index access
+        self._spectrum_keys = list(self.spectrum_offsets.keys())
+        self._chromatogram_keys = list(self.chromatogram_offsets.keys())
 
     def _read_to_spec_end(self, seeker: BinaryIO, chunks_to_read: int = 8) -> tuple[int, int]:
         """Return start and end positions of current spectrum/chromatogram element."""
@@ -564,171 +268,16 @@ class StandardMzml:
             data_chunk += tag_end
             match = regex_patterns.SPECTRUM_CLOSE_PATTERN.search(data_chunk)
             if match:
-                end_pos = match.end()
+                end_pos = start_pos + match.end()
                 end_found = True
             else:
                 match = regex_patterns.CHROMATOGRAM_CLOSE_PATTERN.search(data_chunk)
                 if match:
-                    end_pos = match.end()
+                    end_pos = start_pos + match.end()
                     end_found = True
         if end_pos is None:
             raise Exception("Could not find end of spectrum or chromatogram")
         return (start_pos, end_pos)
-
-    def _read_extremes(self) -> list[tuple[int, int]]:
-        """Find min and max spectrum IDs for use in binary search algorithm."""
-        chunk_size = 128000
-        first_scan = 0
-        last_scan = 0
-        seek_list: list[tuple[int, int]] = []
-
-        with open(self.path, "rb") as seeker:
-            buffer = b""
-            for x in range(100):
-                try:
-                    seeker.seek(os.SEEK_SET + x * chunk_size)
-                except OSError:
-                    break
-                chunk = seeker.read(chunk_size)
-                buffer += chunk
-                match = regex_patterns.SPECTRUM_OPEN_PATTERN_SIMPLE.search(buffer)
-                if match is not None:
-                    id_match = regex_patterns.SPECTRUM_ID_PATTERN_SIMPLE.search(buffer)
-                    if id_match:
-                        id_group = id_match.group("id")
-                        num_match = re.search(b"[0-9]*$", id_group)
-                        if num_match:
-                            try:
-                                first_scan = int(num_match.group())
-                            except ValueError:
-                                first_scan = 0
-                    seek_list.append((first_scan, seeker.tell() - chunk_size + match.start()))
-                    break
-
-            buffer = b""
-            seeker.seek(0, os.SEEK_END)
-            for x in range(1, 100):
-                try:
-                    seeker.seek(-x * chunk_size, os.SEEK_END)
-                except OSError:
-                    break
-                chunk = seeker.read(chunk_size)
-                buffer = chunk + buffer
-
-                matches = list(regex_patterns.SPECTRUM_OPEN_PATTERN_SIMPLE.finditer(buffer))
-                if len(matches) != 0:
-                    id_match = regex_patterns.SPECTRUM_ID_PATTERN_SIMPLE.search(
-                        buffer[matches[-1].start() :]
-                    )
-                    if id_match:
-                        id_group = id_match.group("id")
-                        num_match = re.search(b"[0-9]*$", id_group)
-                        if num_match:
-                            last_scan = int(num_match.group())
-                    seek_list.append((last_scan, seeker.tell() - chunk_size + matches[-1].start()))
-                    break
-        return seek_list
-
-    def _search_linear(self, seeker: BinaryIO, index: int, chunk_size: int = 8) -> spec.Spectrum:
-        """Linearly scan through file to locate spectrum."""
-        total_chunk_size = chunk_size * 512
-
-        while True:
-            file_pointer = seeker.tell()
-            data = seeker.read(total_chunk_size)
-            string, seeker = self._read_until_tag_end(seeker)
-            data += string
-
-            spec_start = self.spec_open.search(data)
-            if spec_start:
-                spec_start_offset = file_pointer + spec_start.start()
-                seeker.seek(spec_start_offset)
-                spec_info = spec_start.groups()
-                spec_info_dict = dict(zip(spec_info[0::2], spec_info[1::2], strict=False))
-
-                id_match = re.search(b"[0-9]*$", spec_info_dict[b"id"])
-                current_index = int(id_match.group()) if id_match else 0
-
-                spec_end = self.spec_close.search(data[spec_start.start() :])
-                spec_end_offset: int | None = None
-                if spec_end:
-                    spec_end_offset = file_pointer + spec_end.end() + spec_start.start()
-                    seeker.seek(spec_end_offset)
-                else:
-                    # spec_end is None, search for it in subsequent chunks
-                    while spec_end is None:
-                        file_pointer = seeker.tell()
-                        data = seeker.read(total_chunk_size)
-                        string, seeker = self._read_until_tag_end(seeker)
-                        data += string
-
-                        spec_end = self.spec_close.search(data)
-                        if spec_end:
-                            spec_end_offset = file_pointer + spec_end.end()
-                            seeker.seek(spec_end_offset)
-                            break
-
-                # Store the offset information
-                if spec_end_offset is None:
-                    raise Exception("Could not find end of spectrum during linear search")
-                self.offset_dict[current_index] = (
-                    spec_start_offset,
-                    spec_end_offset,
-                )
-
-                if current_index == index:
-                    seeker.seek(spec_start_offset)
-                    spec_string: bytes = seeker.read(spec_end_offset - spec_start_offset)
-                    xml_element = XML(spec_string)
-                    return spec.Spectrum(xml_element)
-
-    def _search_string_identifier(
-        self, search_string: str, chunk_size: int = 8
-    ) -> spec.Spectrum | chromatogram.Chromatogram:
-        with self.get_binary_file_handler() as seeker:
-            data = None
-            total_chunk_size = chunk_size * 512
-            spec_start = None
-
-            # NOTE: This needs to go intp regex_patterns.py
-
-            regex_string = re.compile(
-                '<\\s*spectrum[^>]*index="[0-9]+"\\sid="({})"\\sdefaultArrayLength="[0-9]+">'.format(
-                    "".join([".*", search_string, ".*"])
-                ).encode()
-            )
-
-            search_string_bytes = search_string.encode()
-
-            while True:
-                file_pointer = seeker.tell()
-
-                data = seeker.read(total_chunk_size)
-                string, seeker = self._read_until_tag_end(seeker)
-                data += string
-                spec_start = regex_string.search(data)
-                chrom_start = regex_patterns.CHROMO_OPEN_PATTERN.search(data)
-                if spec_start:
-                    spec_start_offset = file_pointer + spec_start.start()
-                    current_index = spec_start.group(1)
-                    if search_string_bytes in current_index:
-                        seeker.seek(spec_start_offset)
-                        start, end = self._read_to_spec_end(seeker)
-                        seeker.seek(start)
-                        spec_string = seeker.read(end)
-                        xml_string = XML(spec_string)
-                        return spec.Spectrum(xml_string)
-                elif chrom_start:
-                    chrom_start_offset = file_pointer + chrom_start.start()
-                    if search_string_bytes == chrom_start.group(1):
-                        seeker.seek(chrom_start_offset)
-                        start, end = self._read_to_spec_end(seeker)
-                        seeker.seek(start)
-                        chrom_string = seeker.read(end)
-                        xml_string = XML(chrom_string)
-                        return chromatogram.Chromatogram(xml_string)
-                elif len(data) == 0:
-                    raise Exception("cant find specified string")
 
     def _read_until_tag_end(
         self, seeker: BinaryIO, max_search_len: int = 12
@@ -752,3 +301,8 @@ class StandardMzml:
     def close(self) -> None:
         """Close file handler."""
         self.file_handler.close()
+
+    @property
+    def TIC(self) -> MzmlXMLElement:
+        """Retrieve the Total Ion Chromatogram (TIC)."""
+        return self.get_chromatogram_by_id("TIC")

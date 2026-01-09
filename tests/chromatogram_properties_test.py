@@ -11,7 +11,7 @@ sys.path.append(os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 
 import unittest
 import pymzml.run as run
-import test_file_paths
+from test_file_paths import DataFiles, get_data_file_paths
 
 
 class ChromatogramPropertiesTest(unittest.TestCase):
@@ -20,30 +20,13 @@ class ChromatogramPropertiesTest(unittest.TestCase):
     """
 
     def setUp(self):
-        """Set up test cases."""
-        self.paths = test_file_paths.paths
-
-        # Use a file with chromatograms for testing
-        # mini.chrom.mzML is at index 3
-        for path in self.paths:
-            if (
-                "mini.chrom.mzML" in path
-                and not path.endswith(".gz")
-                and not path.endswith(".idx.gz")
-            ):
-                self.chrom_file = path
-                break
-        else:
-            # Fallback to a known index if the file name is not found
-            self.chrom_file = self.paths[3]  # mini.chrom.mzML
-
-        # Initialize reader with chromatograms
-        self.reader = run.Reader(self.chrom_file, skip_chromatogram=False)
+         # Initialize reader with chromatograms
+        self.reader = run.Reader(get_data_file_paths(DataFiles.MINI_CHROM))
 
     def test_chromatogram_type(self):
         """Test the chromatogram_type property."""
         # Get the first chromatogram
-        chromatogram = self.reader.get_chromatogram(0)
+        chromatogram = self.reader.chromatograms[0]
 
         # Test that chromatogram_type is accessible
         chromatogram_type = chromatogram.chromatogram_type
@@ -57,7 +40,7 @@ class ChromatogramPropertiesTest(unittest.TestCase):
     def test_polarity(self):
         """Test the polarity property."""
         # Get the first chromatogram
-        chromatogram = self.reader.get_chromatogram(0)
+        chromatogram = self.reader.chromatograms[0]
 
         # Test that polarity is accessible
         polarity = chromatogram.polarity
@@ -71,7 +54,7 @@ class ChromatogramPropertiesTest(unittest.TestCase):
     def test_precursor_mz(self):
         """Test the precursor_mz property."""
         # Get the first chromatogram
-        chromatogram = self.reader.get_chromatogram(0)
+        chromatogram = self.reader.chromatograms[0]
 
         # Test that precursor_mz is accessible
         precursor_mz = chromatogram.precursor_mz
@@ -85,7 +68,7 @@ class ChromatogramPropertiesTest(unittest.TestCase):
     def test_product_mz(self):
         """Test the product_mz property."""
         # Get the first chromatogram
-        chromatogram = self.reader.get_chromatogram(0)
+        chromatogram = self.reader.chromatograms[0]
 
         # Test that product_mz is accessible
         product_mz = chromatogram.product_mz
@@ -99,7 +82,7 @@ class ChromatogramPropertiesTest(unittest.TestCase):
     def test_get_chromatogram_properties(self):
         """Test the get_chromatogram_properties method."""
         # Get the first chromatogram
-        chromatogram = self.reader.get_chromatogram(0)
+        chromatogram = self.reader.chromatograms[0]
 
         # Test that get_chromatogram_properties returns a dictionary
         properties = chromatogram.get_chromatogram_properties()
@@ -121,7 +104,7 @@ class ChromatogramPropertiesTest(unittest.TestCase):
     def test_all_chromatograms(self):
         """Test all chromatograms in the file."""
         # Get the number of chromatograms
-        chrom_count = self.reader.get_chromatogram_count()
+        chrom_count = self.reader.chromatograms.count
 
         if chrom_count is None or chrom_count == 0:
             self.skipTest("Test file does not contain chromatograms")
@@ -130,7 +113,7 @@ class ChromatogramPropertiesTest(unittest.TestCase):
 
         # Test each chromatogram
         for i in range(chrom_count):
-            chromatogram = self.reader.get_chromatogram(i)
+            chromatogram = self.reader.chromatograms[i]
 
             # Print information about the chromatogram
             print(f"\nChromatogram {i}:")

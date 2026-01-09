@@ -2,11 +2,8 @@
 """
 Part of pymzml test cases
 """
-
-from pymzml.file_classes.standardGzip import StandardGzip
+import pymzml as pmz
 import unittest
-from pymzml.spec import Spectrum
-from pymzml.chromatogram import Chromatogram
 import test_file_paths
 
 
@@ -16,7 +13,7 @@ class StandardGzipTest(unittest.TestCase):
     def setUp(self):
         """ """
         paths = test_file_paths.paths
-        self.File = StandardGzip(paths[1], "latin-1")
+        self.File = pmz.StandardGzip(paths[1], "latin-1")
 
     def tearDown(self):
         """ """
@@ -25,15 +22,13 @@ class StandardGzipTest(unittest.TestCase):
     def test_getitem_5(self):
         """ """
         ID = 5
-        spec = self.File[ID]
-        self.assertIsInstance(spec, Spectrum)
-        self.assertEqual(spec.ID, ID)
+        spec = self.File.get_spectrum_by_index(ID)  
+        self.assertIsInstance(spec, pmz.MzmlXMLElement)
 
     def test_getitem_tic(self):
         ID = "TIC"
-        chrom = self.File[ID]
-        self.assertIsInstance(chrom, Chromatogram)
-        self.assertEqual(chrom.ID, ID)
+        chrom = self.File.TIC
+        self.assertIsInstance(chrom, pmz.MzmlXMLElement)
 
 
 if __name__ == "__main__":

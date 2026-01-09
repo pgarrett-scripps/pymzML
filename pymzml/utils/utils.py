@@ -1,12 +1,15 @@
-import numpy as np
-from numpy.typing import NDArray
+import os
+from re import Pattern
 import gzip
 import re
 from collections.abc import Callable
-from typing import IO
+from typing import IO, Match
+
+import numpy as np
+from numpy.typing import NDArray
 
 from .. import regex_patterns
-from ..constants import FileExtension, SpecialID, XMLTag, NoiseMode
+from ..constants import FileExtension, NoiseMode, SpecialID, XMLTag
 from .gzip_writer import GzipWriter
 
 
@@ -189,7 +192,6 @@ def make_obo_mapping(obo: str, reversed: bool = False) -> dict[str, str]:
     return mapping
 
 
-
 def filter_range(
     arr: NDArray[np.float64],
     mz_range: tuple[float | None, float | None],
@@ -203,6 +205,7 @@ def filter_range(
     mask = np.logical_and(arr[:, 0] >= min_mz, arr[:, 0] <= max_mz)
     peaks = arr[mask]
     return peaks
+
 
 def filter_noise(
     arr: NDArray[np.float64],
@@ -218,14 +221,14 @@ def filter_noise(
     if noise_level is None:
         noise_level = estimated_noise_level(arr, mode=mode)
 
-    peaks = arr[
-        arr[:, 1] / noise_level >= signal_to_noise_threshold
-    ]
+    peaks = arr[arr[:, 1] / noise_level >= signal_to_noise_threshold]
 
     return peaks
 
 
-def estimated_noise_level(arr: NDArray[np.float64], mode: str | NoiseMode = NoiseMode.MEDIAN) -> float:
+def estimated_noise_level(
+    arr: NDArray[np.float64], mode: str | NoiseMode = NoiseMode.MEDIAN
+) -> float:
     """Estimate noise level using specified mode (median, mean, or MAD)."""
     # Convert string to enum if needed
     if isinstance(mode, str):  # type: ignore
@@ -238,9 +241,7 @@ def estimated_noise_level(arr: NDArray[np.float64], mode: str | NoiseMode = Nois
         return float(np.median(arr[:, 1]))
     elif mode == NoiseMode.MAD:
         median = estimated_noise_level(arr, mode=NoiseMode.MEDIAN)
-        return float(
-            np.median(np.abs(arr[:, 1] - median))
-        )
+        return float(np.median(np.abs(arr[:, 1] - median)))
     elif mode == NoiseMode.MEAN:
         return float(np.mean(arr[:, 1]))
     else:
