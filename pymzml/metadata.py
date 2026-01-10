@@ -10,7 +10,7 @@ class MzMLMetadata:
     file_name: str
     encoding: str
     file_object: FileInterface
-    obo_version: str | None
+    obo_version: str | None = None
     mzml_version: str | None = None
     spectrum_count: int | None = None
     chromatogram_count: int | None = None

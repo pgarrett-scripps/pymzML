@@ -25,12 +25,11 @@ class StandardMzmlTest(unittest.TestCase):
         id = 8
         spec = self.standard_mzml.get_spectrum_by_index(id)
         self.assertIsInstance(spec, pmz.MzmlXMLElement)
-        self.assertEqual(spec.element_type, pmz.ElementType.SPECTRUM)
+        self.assertEqual(spec.element_type, "spectrum")
 
         chrom = self.standard_mzml.TIC
         self.assertIsInstance(chrom, pmz.MzmlXMLElement)
-        self.assertEqual(chrom.element_type, pmz.ElementType.CHROMATOGRAM)
-
+        self.assertEqual(chrom.element_type, "chromatogram")
 
 
 if __name__ == "__main__":

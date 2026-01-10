@@ -11,23 +11,20 @@ from .constants import (
 from .decoder import MSDecoder
 from .file_classes import (
     BytesMzml,
-    ElementType,
-    IndexedGzip,
+    ChromatogramElement,
     MzmlXMLElement,
+    SpectrumElement,
     StandardGzip,
     StandardMzml,
 )
 from .run import Reader
 from .spec import Spectrum
-from .utils import GzipReader, GzipWriter
 
 __all__ = [
     "Reader",
     "Spectrum",
     "Chromatogram",
     "MSDecoder",
-    "GzipReader",
-    "GzipWriter",
     "PROTON_MASS",
     "ISOTOPE_AVERAGE_DIFFERENCE",
     "PeakType",
@@ -37,8 +34,8 @@ __all__ = [
     "run",
     "StandardMzml",
     "StandardGzip",
-    "IndexedGzip",
     "BytesMzml",
     "MzmlXMLElement",
-    "ElementType",
+    "SpectrumElement",
+    "ChromatogramElement",
 ]

@@ -26,8 +26,9 @@ class Reader:
     def __init__(
         self,
         path_or_file: str | Path | Any,
-        obo_version: str | None = None,
         build_index_from_scratch: bool = False,
+        extract_gzip: bool = True,
+        in_memory: bool = False,
     ) -> None:
         """Initialize and set required attributes."""
         self.build_index_from_scratch: bool = build_index_from_scratch
@@ -47,10 +48,14 @@ class Reader:
                 file_name = str(path_or_file)
                 encoding = self._guess_encoding(path_or_file)  # type: ignore[arg-type]
 
-        file_object = self._open_file(
+            
+
+        file_object: FileInterface = self._open_file(
             self.path_or_file,
             build_index_from_scratch=self.build_index_from_scratch,
             encoding=encoding,
+            extract_gzip=extract_gzip,
+            in_memory=in_memory,
         )
 
         # File info
@@ -58,7 +63,6 @@ class Reader:
             file_name=file_name, 
             encoding=encoding, 
             file_object=file_object, 
-            obo_version=obo_version
         )
 
         self.iter: Iterator[tuple[str, ElementTree.Element]] = self._init_iter()
@@ -68,12 +72,12 @@ class Reader:
     @property
     def spectra(self) -> SpectrumLookup:
         """Access spectra lookup."""
-        return SpectrumLookup(file_object=self.info.file_object, file_info=self.info)
+        return SpectrumLookup(file_object=self.info.file_object)
 
     @property
     def chromatograms(self) -> ChromatogramLookup:
         """Access chromatograms lookup."""
-        return ChromatogramLookup(file_object=self.info.file_object, file_info=self.info)
+        return ChromatogramLookup(file_object=self.info.file_object)
 
     def __enter__(self) -> "Reader":
         return self
@@ -93,6 +97,8 @@ class Reader:
         path_or_file: str | Path | Any,
         build_index_from_scratch: bool = False,
         encoding: str = "utf-8",
+        extract_gzip: bool = True,
+        in_memory: bool = False,
     ) -> FileInterface:
         """
         Open the path using the FileInterface class as a wrapper.
@@ -105,6 +111,8 @@ class Reader:
             path=path_or_file,
             encoding=encoding,
             build_index_from_scratch=build_index_from_scratch,
+            extract_gzip=extract_gzip,
+            in_memory=in_memory,
         )
 
     def _guess_encoding(self, mzml_file: Any) -> str:
@@ -140,7 +148,12 @@ class Reader:
         of the spectrumList element.
         """
         # Pass the FileInterface's underlying file handler directly
-        file_handle = self.info.file_object.file_handler.file_handler
+        # Use get_file_handler from the interface to ensure we have a valid text stream
+        file_handle = self.info.file_object.file_handler.get_file_handler(self.info.encoding)
+        
+        # We need to make sure we close this handle later or it might leak if not fully consumed
+        # For now, relying on Python's GC for this temporary handle used for metadata parsing
+        
         mzml_iter: Iterator[tuple[str, ElementTree.Element]] = iter(
             ElementTree.iterparse(file_handle, events=("end", "start"))  # type: ignore[arg-type]
         )  # NOTE: end might be sufficient
@@ -225,7 +238,7 @@ class Reader:
         return self.chromatograms.get_by_id("TIC")
 
     def close(self) -> None:
-        self.info.file_object.close()  # type: ignore[union-attr]
+        self.info.file_object.close()
 
 
 if __name__ == "__main__":

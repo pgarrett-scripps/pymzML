@@ -13,7 +13,6 @@ for i, chromatogram in enumerate(reader.chromatograms):
 
 reader.chromatograms[0]  # Access by index
 
-sys.exit(0)
 
 
 print("Reading mzML file using pymzml...")

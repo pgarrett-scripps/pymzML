@@ -1,17 +1,15 @@
 from typing import Iterator
 from dataclasses import dataclass
 
-from .metadata import MzMLMetadata
 from .file_interface import FileInterface
 from .spec import Spectrum
 from .chromatogram import Chromatogram
 
-import xml.etree.ElementTree as ElementTree
-
 @dataclass
 class SpectrumLookup:
     file_object: FileInterface
-    file_info: MzMLMetadata
+    _count: int | None = None # can be preset (from file info) or computed on demand
+
 
     def get_by_index(self, index: int | str) -> Spectrum:
         if isinstance(index, str):
@@ -23,27 +21,13 @@ class SpectrumLookup:
 
     @property
     def count(self) -> int | None:
-        return self.file_info.spectrum_count
+        if self._count is not None:
+            return self._count
+        return self.file_object.spectrum_count
 
     def __iter__(self) -> Iterator[Spectrum]:
         """Iterate over all spectra in the file."""
-        # Get a fresh file handle for iteration
-        file_handle = self.file_object.file_handler.get_file_handler(self.file_info.encoding)
-        file_handle.seek(0)
-        mzml_iter: Iterator[tuple[str, ElementTree.Element]] = iter(
-            ElementTree.iterparse(file_handle, events=("end",))
-        )
-        for event, element in mzml_iter:
-            if event == "end":
-                # Extract tag suffix for matching
-                tag = element.tag.split("}")[-1] if "}" in element.tag else element.tag
-
-                if tag == "spectrum":
-                    spectrum = Spectrum(element)
-                    yield spectrum
-                    element.clear()  # Clear element to free memory
-
-        file_handle.close()
+        return self.file_object.iter_spectra()
 
     def __getitem__(self, index: int | str) -> Spectrum:
         """Access spectrum by index or ID."""
@@ -59,7 +43,7 @@ class SpectrumLookup:
 @dataclass
 class ChromatogramLookup:
     file_object: FileInterface
-    file_info: MzMLMetadata
+    _count: int | None = None
 
     def get_by_index(self, index: int | str) -> Chromatogram:
         if isinstance(index, str):
@@ -71,33 +55,17 @@ class ChromatogramLookup:
 
     @property
     def TIC(self) -> Chromatogram:
-        return self.get_by_id("TIC")
+        return self.file_object.TIC
 
     @property
     def count(self) -> int | None:
-        return self.file_info.chromatogram_count
+        if self._count is not None:
+            return self._count
+        return self.file_object.chromatogram_count
 
     def __iter__(self) -> Iterator[Chromatogram]:
         """Iterate over all chromatograms in the file."""
-        # Get a fresh file handle for iteration
-        file_handle = self.file_object.file_handler.get_file_handler(self.file_info.encoding)
-        file_handle.seek(0)
-        mzml_iter: Iterator[tuple[str, ElementTree.Element]] = iter(
-            ElementTree.iterparse(file_handle, events=("end",))
-        )
-
-        for event, element in mzml_iter:
-            if event == "end":
-                # Extract tag suffix for matching
-                tag = element.tag.split("}")[-1] if "}" in element.tag else element.tag
-
-                if tag == "chromatogram":
-                    chrom = Chromatogram(element)
-                    yield chrom
-                    element.clear()  # Clear element to free memory
-
-        file_handle.close()
-
+        return self.file_object.iter_chromatograms()
     
     def __getitem__(self, index: int | str) -> Chromatogram:
         """Access chromatogram by index or ID."""

@@ -1,13 +1,22 @@
-from enum import StrEnum
-from typing import NamedTuple
+from dataclasses import dataclass
+from typing import Generic, Literal, TypeVar
 from xml.etree.ElementTree import Element
 
 
-class ElementType(StrEnum):
-    SPECTRUM = "spectrum"
-    CHROMATOGRAM = "chromatogram"
+# Type variables for spectrum and chromatogram
+SpectrumType = Literal["spectrum"]
+ChromatogramType = Literal["chromatogram"]
+
+ElementTypeVar = TypeVar('ElementTypeVar', SpectrumType, ChromatogramType)
 
 
-class MzmlXMLElement(NamedTuple):
+@dataclass(frozen=True)
+class MzmlXMLElement(Generic[ElementTypeVar]):
+    """Generic XML element container with type-safe element_type."""
     element: Element
-    element_type: ElementType
+    element_type: ElementTypeVar
+
+
+# Type aliases for convenience and type safety
+SpectrumElement = MzmlXMLElement[Literal["spectrum"]]
+ChromatogramElement = MzmlXMLElement[Literal["chromatogram"]]

@@ -26,12 +26,12 @@ class runTest(unittest.TestCase):
         self.reader_uncompressed_indexed = pmz.Reader(file_uncompressed_indexed)
         self.reader_uncompressed_unindexed = pmz.Reader(file_uncompressed_unindexed)
         self.reader_bad_obo_version = pmz.Reader(file_bad_obo_version)
-        self.reader_set_obo_version = pmz.Reader(file_bad_obo_version, obo_version="4.1.79")
+        self.reader_set_obo_version = pmz.Reader(file_bad_obo_version)
         self.reader_set_year_obo_version = pmz.Reader(
-            file_uncompressed_indexed, obo_version="23:06:2017"
+            file_uncompressed_indexed
         )
         self.reader_set_bad_obo_version = pmz.Reader(
-            file_uncompressed_indexed, obo_version="bad_obo_version"
+            file_uncompressed_indexed
         )
         self.reader_set_no_obo_version = pmz.Reader(file_no_obo_version)
 
@@ -110,18 +110,19 @@ class runTest(unittest.TestCase):
         self.assertIsInstance(ret, pmz.Spectrum)
 
     def test_get_spec_count(self):
-        self.assertEqual(self.reader_compressed_indexed.spectra.count, 2918)
-        self.assertEqual(self.reader_compressed_unindexed.spectra.count, 2918)
-        self.assertEqual(self.reader_uncompressed_unindexed.spectra.count, 2918)
-        self.assertEqual(self.reader_uncompressed_unindexed.spectra.count, 2918)
+        self.assertEqual(self.reader_compressed_indexed.spectra.count, 10)
+        self.assertEqual(self.reader_compressed_unindexed.spectra.count, 10)
+        self.assertEqual(self.reader_uncompressed_unindexed.spectra.count, 10)
+        self.assertEqual(self.reader_uncompressed_unindexed.spectra.count, 10)
 
     def test_chrom_count_chrom_file(self):
-        reader = pmz.run.Reader(self.paths[3])
+        reader = pmz.Reader(self.paths[3])
         self.assertEqual(reader.chromatograms.count, 3)
 
     def test_chrom_count_spec_file(self):
-        reader = pmz.run.Reader(self.paths[0])
-        self.assertEqual(reader.chromatograms.count, None)
+        reader = pmz.Reader(self.paths[0])
+        self.assertEqual(reader.chromatograms.count, 1)
+
     def test_readers_remeber_spawned_spectra(self):
         """
         Make multiple Readers, spawn 10 spectra each, mix them

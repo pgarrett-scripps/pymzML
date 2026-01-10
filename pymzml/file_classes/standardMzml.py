@@ -1,41 +1,47 @@
+from functools import cached_property
+from io import BytesIO, TextIOWrapper
 import re
+from abc import ABC, abstractmethod
 from collections import OrderedDict
 from re import Pattern
 from typing import BinaryIO, TextIO
 from xml.etree.ElementTree import XML
 
 from .. import regex_patterns
-from .xml_tuple import ElementType, MzmlXMLElement
+from .interface import MzmlInterface
+from .xml_tuple import ChromatogramElement, MzmlXMLElement, SpectrumElement
 
 
-class StandardMzml:
-    """Random-access mzML file reader using binary searching and caching."""
+class AbstractRandomAccessMzml(MzmlInterface, ABC):
+    """Abstract base class for random-access mzML file readers."""
 
     def __init__(
         self,
-        path: str,
         encoding: str,
         build_index_from_scratch: bool = False,
         index_regex: Pattern[bytes] | None = None,
     ) -> None:
         self.index_regex: Pattern[bytes] | None = index_regex
-        self.path: str = path
-        self.file_handler: TextIO = self.get_file_handler(encoding)
-
+        
         self.spectrum_offsets: OrderedDict[str, int] = OrderedDict()
         self.chromatogram_offsets: OrderedDict[str, int] = OrderedDict()
         self._spectrum_keys: list[str] = []  # For fast O(1) index access
         self._chromatogram_keys: list[str] = []  # For fast O(1) index access
 
+        self.file_handler: TextIO = self.get_file_handler(encoding)
         self._build_index(from_scratch=build_index_from_scratch)
 
+    @abstractmethod
     def get_binary_file_handler(self) -> BinaryIO:
-        return open(self.path, "rb")
+        """Return a binary file handler positioned at the start."""
+        pass
 
+    @abstractmethod
     def get_file_handler(self, encoding: str) -> TextIO:
-        return open(self.path, encoding=encoding)
+        """Return a text file handler positioned at the start."""
+        pass
 
-    def get_spectrum_by_id(self, identifier: str | int) -> MzmlXMLElement:
+    def get_spectrum_by_id(self, identifier: str | int) -> SpectrumElement:
         """Retrieve spectrum by native ID.
 
         Args:
@@ -52,15 +58,18 @@ class StandardMzml:
 
         offset = self.spectrum_offsets[identifier]
         seeker = self.get_binary_file_handler()
-        seeker.seek(offset)
-        _, end_pos = self._read_to_spec_end(seeker)
-        seeker.close()
+        try:
+            seeker.seek(offset)
+            _, end_pos = self._read_to_spec_end(seeker)
+        finally:
+            seeker.close()
+            
         self.file_handler.seek(offset, 0)
         data = self.file_handler.read(end_pos - offset)
 
-        return MzmlXMLElement(XML(data), element_type=ElementType.SPECTRUM)
+        return MzmlXMLElement(XML(data), element_type="spectrum")
 
-    def get_spectrum_by_index(self, index: int) -> MzmlXMLElement:
+    def get_spectrum_by_index(self, index: int) -> SpectrumElement:
         """Retrieve spectrum by 0-based index.
 
         Args:
@@ -75,7 +84,7 @@ class StandardMzml:
         key = self._spectrum_keys[index]
         return self.get_spectrum_by_id(key)
 
-    def get_chromatogram_by_id(self, identifier: str | int) -> MzmlXMLElement:
+    def get_chromatogram_by_id(self, identifier: str | int) -> ChromatogramElement:
         """Retrieve chromatogram by native ID.
 
         Args:
@@ -92,15 +101,18 @@ class StandardMzml:
 
         offset = self.chromatogram_offsets[identifier]
         seeker = self.get_binary_file_handler()
-        seeker.seek(offset)
-        _, end_pos = self._read_to_spec_end(seeker)
-        seeker.close()
+        try:
+            seeker.seek(offset)
+            _, end_pos = self._read_to_spec_end(seeker)
+        finally:
+            seeker.close()
+            
         self.file_handler.seek(offset, 0)
         data = self.file_handler.read(end_pos - offset)
 
-        return MzmlXMLElement(XML(data), element_type=ElementType.CHROMATOGRAM)
+        return MzmlXMLElement(XML(data), element_type="chromatogram")
 
-    def get_chromatogram_by_index(self, index: int) -> MzmlXMLElement:
+    def get_chromatogram_by_index(self, index: int) -> ChromatogramElement:
         """Retrieve chromatogram by 0-based index.
 
         Args:
@@ -124,61 +136,61 @@ class StandardMzml:
         Reads index from file footer if available, otherwise parses entire file.
         """
         seeker = self.get_binary_file_handler()
+        try:
+            # Find indexListOffset in file footer (last 10KB)
+            seeker.seek(0, 2)
+            file_size = seeker.tell()
+            search_start = max(0, file_size - 10240)  # Last 10KB
+            seeker.seek(search_start)
+            footer_data = seeker.read()
 
-        # Find indexListOffset in file footer (last 10KB)
-        seeker.seek(0, 2)
-        file_size = seeker.tell()
-        search_start = max(0, file_size - 10240)  # Last 10KB
-        seeker.seek(search_start)
-        footer_data = seeker.read()
+            # Look for <indexListOffset>...</indexListOffset>
+            index_offset_match = regex_patterns.INDEX_LIST_OFFSET_PATTERN.search(footer_data)
 
-        # Look for <indexListOffset>...</indexListOffset>
-        index_offset_match = regex_patterns.INDEX_LIST_OFFSET_PATTERN.search(footer_data)
+            if index_offset_match:
+                index_list_offset = int(index_offset_match.group("indexListOffset").decode("utf-8"))
+                seeker.seek(index_list_offset, 0)
 
-        if index_offset_match:
-            index_list_offset = int(index_offset_match.group("indexListOffset").decode("utf-8"))
-            seeker.seek(index_list_offset, 0)
+                # Read index section - parse XML structure
+                current_index_type = None
+                offset_pattern = re.compile(rb'<offset idRef="([^"]*)"[^>]*>(\d+)</offset>')
+                index_name_pattern = re.compile(rb'<index name="([^"]*)">')
 
-            # Read index section - parse XML structure
-            current_index_type = None
-            offset_pattern = re.compile(rb'<offset idRef="([^"]*)"[^>]*>(\d+)</offset>')
-            index_name_pattern = re.compile(rb'<index name="([^"]*)">')
+                for line in seeker:
+                    # Check if we're entering a new index section
+                    name_match = index_name_pattern.search(line)
+                    if name_match:
+                        current_index_type = name_match.group(1).decode("utf-8")
+                        continue
 
-            for line in seeker:
-                # Check if we're entering a new index section
-                name_match = index_name_pattern.search(line)
-                if name_match:
-                    current_index_type = name_match.group(1).decode("utf-8")
-                    continue
+                    # Parse offset entries
+                    offset_match = offset_pattern.search(line)
+                    if offset_match and current_index_type:
+                        native_id = offset_match.group(1).decode("utf-8")
+                        offset = int(offset_match.group(2).decode("utf-8"))
 
-                # Parse offset entries
-                offset_match = offset_pattern.search(line)
-                if offset_match and current_index_type:
-                    native_id = offset_match.group(1).decode("utf-8")
-                    offset = int(offset_match.group(2).decode("utf-8"))
+                        if current_index_type == "spectrum":
+                            self.spectrum_offsets[native_id] = offset
+                        elif current_index_type == "chromatogram":
+                            self.chromatogram_offsets[native_id] = offset
 
-                    if current_index_type == "spectrum":
-                        self.spectrum_offsets[native_id] = offset
-                    elif current_index_type == "chromatogram":
-                        self.chromatogram_offsets[native_id] = offset
+                    # Stop at end of indexList
+                    if b"</indexList>" in line:
+                        break
 
-                # Stop at end of indexList
-                if b"</indexList>" in line:
-                    break
+                # Build keys lists for fast index access
+                self._spectrum_keys = list(self.spectrum_offsets.keys())
+                self._chromatogram_keys = list(self.chromatogram_offsets.keys())
 
-            # Build keys lists for fast index access
-            self._spectrum_keys = list(self.spectrum_offsets.keys())
-            self._chromatogram_keys = list(self.chromatogram_offsets.keys())
-
-        else:
-            # No index found - build from scratch regardless of flag
-            # This is necessary for random access to work
-            if not from_scratch:
-                print("[Warning] No index found, building from scratch for random access support")
-            seeker.seek(0)
-            self._build_index_from_scratch(seeker)
-
-        seeker.close()
+            else:
+                # No index found - build from scratch regardless of flag
+                # This is necessary for random access to work
+                if not from_scratch:
+                    print("[Warning] No index found, building from scratch for random access support")
+                seeker.seek(0)
+                self._build_index_from_scratch(seeker)
+        finally:
+            seeker.close()
 
     def _build_index_from_scratch(self, seeker: BinaryIO) -> None:
         """Build index by parsing the file for spectrum/chromatogram elements."""
@@ -303,6 +315,54 @@ class StandardMzml:
         self.file_handler.close()
 
     @property
-    def TIC(self) -> MzmlXMLElement:
+    def TIC(self) -> ChromatogramElement:
         """Retrieve the Total Ion Chromatogram (TIC)."""
         return self.get_chromatogram_by_id("TIC")
+    
+    @cached_property
+    def spectrum_count(self) -> int | None:
+        """Count of spectra in the file, if determinable."""
+        return len(self.spectrum_offsets) if self.spectrum_offsets else None
+    
+    @cached_property
+    def chromatogram_count(self) -> int | None:
+        """Count of chromatograms in the file, if determinable."""
+        return len(self.chromatogram_offsets) if self.chromatogram_offsets else None
+
+
+class StandardMzml(AbstractRandomAccessMzml):
+    """Random-access mzML file reader using binary searching and caching."""
+
+    def __init__(
+        self,
+        path: str,
+        encoding: str,
+        build_index_from_scratch: bool = False,
+        index_regex: Pattern[bytes] | None = None,
+    ) -> None:
+        self.path: str = path
+        super().__init__(encoding, build_index_from_scratch, index_regex)
+
+    def get_binary_file_handler(self) -> BinaryIO:
+        return open(self.path, "rb")
+
+    def get_file_handler(self, encoding: str) -> TextIO:
+        return open(self.path, encoding=encoding)
+    
+
+class BytesMzml(AbstractRandomAccessMzml):
+    """mzML file wrapper for in-memory BytesIO objects."""
+
+    def __init__(
+        self, binary: BytesIO, encoding: str, build_index_from_scratch: bool = False
+    ) -> None:
+        self.binary: BytesIO = binary
+        # Reset position for initial reads
+        self.binary.seek(0)
+        super().__init__(encoding, build_index_from_scratch)
+
+    def get_binary_file_handler(self) -> BinaryIO:
+        return BytesIO(self.binary.getbuffer())
+
+    def get_file_handler(self, encoding: str) -> TextIO:
+        return TextIOWrapper(self.get_binary_file_handler(), encoding=encoding)

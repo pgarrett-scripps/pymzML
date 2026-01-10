@@ -21,7 +21,7 @@ from .constants import (
     TimeUnit,
 )
 from .msdata import MsData
-from .utils.utils import filter_noise, filter_range
+from .utils import filter_noise, filter_range
 
 logger = logging.getLogger(__name__)
 
