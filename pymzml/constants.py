@@ -1,3 +1,4 @@
+from ctypes.wintypes import BYTE
 from enum import StrEnum
 
 
@@ -37,12 +38,11 @@ class TimeUnit(StrEnum):
 class BinaryDataTypeAccession(StrEnum):
     """Enumeration of binary data type accessions."""
 
-    FLOAT_32 = "MS:1000521"  # 32-bit precision little-endian floating point (IEEE-754)
-    FLOAT_64 = "MS:1000523"  # 64-bit precision little-endian floating point (IEEE-754)
-    INT_32 = "MS:1000519"  # Signed 32-bit little-endian integer
-    INT_64 = "MS:1000522"  # Signed 64-bit little-endian integer
-    # MS:1000520 (16-bit float) is obsolete and not included
-    ASCII_STRING = "MS:1001479"  # null-terminated ASCII string
+    FLOAT_32 = "MS:1000521"
+    FLOAT_64 = "MS:1000523"
+    INT_32 = "MS:1000519"
+    INT_64 = "MS:1000522"
+    ASCII_STRING = "MS:1001479"
 
 
 class CompressionType(StrEnum):
@@ -55,6 +55,28 @@ class CompressionType(StrEnum):
     NUMPRESS_SLOF = "ms-np-slof"
     NUMPRESS_LINEAR_FULL = "MS-Numpress linear prediction compression"
     NUMPRESS_SLOF_FULL = "MS-Numpress short logged float compression"
+
+
+class CompressionTypeAccessions(StrEnum):
+    BYTE_SHUFFLED_ZSTD = "MS:1003781"
+    MS_NUMPRESS_SHORT_LOGGED_FLOAT = "MS:1002314"
+    TRUNCATION_LINEAR_PREDICTION_ZLIB = "MS:1003090"
+    ZLIB_COMPRESSION = "MS:1000574"
+    NO_COMPRESSION = "MS:1000576"
+    DICTIONARY_ENCODED_ZSTD = "MS:1003782"
+    MS_NUMPRESS_LINEAR_PREDICTION_ZLIB = (
+        "MS:1002746"  # MS-Numpress linear prediction compression followed by zlib compression
+    )
+    TRUNCATION_ZLIB = "MS:1003088"
+    MS_NUMPRESS_SHORT_LOGGED_FLOAT_ZLIB = "MS:1002748"
+    MS_NUMPRESS_LINEAR_PREDICTION_ZSTD = "MS:1003783"
+    MS_NUMPRESS_POSITIVE_INTEGER_ZLIB = "MS:1002747"
+    MS_NUMPRESS_SHORT_LOGGED_FLOAT_ZSTD = "MS:1003785"
+    MS_NUMPRESS_LINEAR_PREDICTION = "MS:1002312"
+    MS_NUMPRESS_POSITIVE_INTEGER = "MS:1002313"
+    TRUNCATION_DELTA_PREDICTION_ZLIB = "MS:1003089"
+    ZSTD_COMPRESSION = "MS:1003780"
+    MS_NUMPRESS_POSITIVE_INTEGER_ZSTD = "MS:1003784"
 
 
 class MSAccession(StrEnum):
@@ -93,8 +115,8 @@ class EncodingFormat(StrEnum):
 class SpectrumType(StrEnum):
     """Enumeration of spectrum types."""
 
-    PROFILE = "profile spectrum"
-    CENTROID = "centroid spectrum"
+    PROFILE = "MS:1000128"
+    CENTROID = "MS:1000127"
 
 
 class OBOKey(StrEnum):
@@ -139,12 +161,11 @@ class SpecialID(StrEnum):
     JUNK = "junk"
 
 
-class ChromatogramMSAccession(StrEnum):
+class ScanPolarity(StrEnum):
     """Enumeration of MS accessions for chromatogram properties."""
 
     POSITIVE_SCAN = "MS:1000129"
     NEGATIVE_SCAN = "MS:1000130"
-    ISOLATION_WINDOW_TARGET_MZ = "MS:1000827"
 
 
 class SpectrumMSAccession(StrEnum):
@@ -156,6 +177,43 @@ class SpectrumMSAccession(StrEnum):
     PEAK_INTENSITY = "MS:1000042"
     CHARGE_STATE = "MS:1000041"
     TOTAL_ION_CURRENT = "MS:1000285"
+
+
+class BinaryDataArrayAccession(StrEnum):
+    """Enumeration of binary data array accessions."""
+
+    RAW_ION_MOBILITY_ARRAY = "MS:1003007"
+    MEAN_ION_MOBILITY_DRIFT_TIME_ARRAY = "MS:1002477"
+    DECONVOLUTED_ION_MOBILITY_DRIFT_TIME_ARRAY = "MS:1003156"
+    MEAN_INVERSE_REDUCED_ION_MOBILITY_ARRAY = "MS:1003006"
+    MEAN_ION_MOBILITY_ARRAY = "MS:1002816"
+    DECONVOLUTED_INVERSE_REDUCED_ION_MOBILITY_ARRAY = "MS:1003155"
+    RAW_ION_MOBILITY_DRIFT_TIME_ARRAY = "MS:1003153"
+    VACUUM_PUMP_PRESSURE = "MS:4000210"
+    RAW_INVERSE_REDUCED_ION_MOBILITY_ARRAY = "MS:1003008"
+    DECONVOLUTED_ION_MOBILITY_ARRAY = "MS:1003154"
+    TIME_ARRAY = "MS:1000595"
+    MEAN_CHARGE_ARRAY = "MS:1002478"
+    MZ_ARRAY = "MS:1000514"
+    SAMPLED_NOISE_INTENSITY_ARRAY = "MS:1002744"
+    FLOW_RATE_ARRAY = "MS:1000820"
+    CHARGE_ARRAY = "MS:1000516"
+    SAMPLED_NOISE_BASELINE_ARRAY = "MS:1002745"
+    ION_MOBILITY_ARRAY = "MS:1002893"
+    BASELINE_ARRAY = "MS:1002530"
+    RESOLUTION_ARRAY = "MS:1002529"
+    PRESSURE_ARRAY = "MS:1000821"
+    INTENSITY_ARRAY = "MS:1000515"
+    MEASURED_ELEMENT = "MS:1002716"
+    SCANNING_QUADRUPOLE_POSITION_UPPER_BOUND_MZ_ARRAY = "MS:1003158"
+    NON_STANDARD_DATA_ARRAY = "MS:1000786"
+    SCANNING_QUADRUPOLE_POSITION_LOWER_BOUND_MZ_ARRAY = "MS:1003157"
+    NOISE_ARRAY = "MS:1002742"
+    WAVELENGTH_ARRAY = "MS:1000617"
+    SIGNAL_TO_NOISE_ARRAY = "MS:1000517"
+    MASS_ARRAY = "MS:1003143"
+    TEMPERATURE_ARRAY = "MS:1000822"
+    SAMPLED_NOISE_MZ_ARRAY = "MS:1002743"
 
 
 class XMLNamespace(StrEnum):
@@ -198,7 +256,7 @@ NUMPRESS_COMPRESSIONS = frozenset(
 )
 
 # Data type to numpy dtype mapping
-BINARY_DECODE_DTYPES = {
+BINARY_DECODE_DTYPES: dict[BinaryDataTypeAccession, str] = {
     BinaryDataTypeAccession.FLOAT_32: "float32",
     BinaryDataTypeAccession.FLOAT_64: "float64",
     BinaryDataTypeAccession.INT_32: "int32",
@@ -206,23 +264,15 @@ BINARY_DECODE_DTYPES = {
 }
 
 
-chromatogram_type_accessions = {
-    "MS:1000235",
-    "MS:1000627",
-    "MS:1000628",
-    "MS:1000810",
-    "MS:1000811",
-    "MS:1000812",
-    "MS:1000813",
-    "MS:1000814",
-    "MS:1000815",
-    "MS:1001472",
-    "MS:1001473",
-    "MS:1001474",
-    "MS:1001475",
-    "MS:1001476",
-    "MS:1001477",
-    "MS:1001478",
-    "MS:1001479",
-    "MS:1001480",
-}
+class ChromatogramType(StrEnum):
+    EMMISION = "MS:1000813"
+    SELECTED_ION_MONITORING = "MS:1001472"
+    BASEPEAK = "MS:1000628"
+    PRECURSOR_ION_CURRENT = "MS:4000025"
+    TOTAL_ION_CURRENT = "MS:1000235"
+    ABSORPTION = "MS:1000812"
+    SELECTED_REACTION_MONITORING = "MS:1001473"
+    SELECTED_ION_CURRENT = "MS:1000627"
+
+
+ISOLATION_WINDOW_TARGET_MZ = "MS:1000827"

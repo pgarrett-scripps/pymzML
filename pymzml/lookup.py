@@ -1,15 +1,15 @@
-from typing import Iterator
 from dataclasses import dataclass
+from typing import Iterator
 
-from .file_interface import FileInterface
-from .spec import Spectrum
 from .chromatogram import Chromatogram
+from .file_interface import FileInterface
+from .spectrum import Spectrum
+
 
 @dataclass
 class SpectrumLookup:
     file_object: FileInterface
-    _count: int | None = None # can be preset (from file info) or computed on demand
-
+    _count: int | None = None  # can be preset (from file info) or computed on demand
 
     def get_by_index(self, index: int | str) -> Spectrum:
         if isinstance(index, str):
@@ -34,11 +34,11 @@ class SpectrumLookup:
         if isinstance(index, int):
             return self.get_by_index(index)
         return self.get_by_id(index)
-    
+
     def next(self) -> Spectrum:
         """Get next spectrum using iterator."""
         return next(iter(self))
-    
+
 
 @dataclass
 class ChromatogramLookup:
@@ -66,7 +66,7 @@ class ChromatogramLookup:
     def __iter__(self) -> Iterator[Chromatogram]:
         """Iterate over all chromatograms in the file."""
         return self.file_object.iter_chromatograms()
-    
+
     def __getitem__(self, index: int | str) -> Chromatogram:
         """Access chromatogram by index or ID."""
         if isinstance(index, int):

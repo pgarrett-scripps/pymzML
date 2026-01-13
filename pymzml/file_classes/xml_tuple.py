@@ -2,17 +2,17 @@ from dataclasses import dataclass
 from typing import Generic, Literal, TypeVar
 from xml.etree.ElementTree import Element
 
-
 # Type variables for spectrum and chromatogram
-SpectrumType = Literal["spectrum"]
-ChromatogramType = Literal["chromatogram"]
+_SpectrumType = Literal["spectrum"]
+_ChromatogramType = Literal["chromatogram"]
 
-ElementTypeVar = TypeVar('ElementTypeVar', SpectrumType, ChromatogramType)
+ElementTypeVar = TypeVar("ElementTypeVar", _SpectrumType, _ChromatogramType)
 
 
 @dataclass(frozen=True)
 class MzmlXMLElement(Generic[ElementTypeVar]):
     """Generic XML element container with type-safe element_type."""
+
     element: Element
     element_type: ElementTypeVar
 

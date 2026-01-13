@@ -21,12 +21,12 @@ class runTest(unittest.TestCase):
         file_uncompressed_unindexed = self.paths[0]
         file_bad_obo_version = self.paths[10]
         file_no_obo_version = self.paths[11]
-        self.reader_compressed_indexed = pmz.Reader(file_compressed_indexed)
-        self.reader_compressed_unindexed = pmz.Reader(file_compressed_unindexed)
-        self.reader_uncompressed_indexed = pmz.Reader(file_uncompressed_indexed)
-        self.reader_uncompressed_unindexed = pmz.Reader(file_uncompressed_unindexed)
-        self.reader_bad_obo_version = pmz.Reader(file_bad_obo_version)
-        self.reader_set_obo_version = pmz.Reader(file_bad_obo_version)
+        self.reader_compressed_indexed = pmz.Reader(file_compressed_indexed, build_index_from_scratch=True)
+        self.reader_compressed_unindexed = pmz.Reader(file_compressed_unindexed, build_index_from_scratch=True)
+        self.reader_uncompressed_indexed = pmz.Reader(file_uncompressed_indexed, build_index_from_scratch=True)
+        self.reader_uncompressed_unindexed = pmz.Reader(file_uncompressed_unindexed, build_index_from_scratch=True)
+        self.reader_bad_obo_version = pmz.Reader(file_bad_obo_version, build_index_from_scratch=True)
+        self.reader_set_obo_version = pmz.Reader(file_bad_obo_version, build_index_from_scratch=True)
         self.reader_set_year_obo_version = pmz.Reader(
             file_uncompressed_indexed
         )
@@ -110,10 +110,10 @@ class runTest(unittest.TestCase):
         self.assertIsInstance(ret, pmz.Spectrum)
 
     def test_get_spec_count(self):
-        self.assertEqual(self.reader_compressed_indexed.spectra.count, 10)
-        self.assertEqual(self.reader_compressed_unindexed.spectra.count, 10)
-        self.assertEqual(self.reader_uncompressed_unindexed.spectra.count, 10)
-        self.assertEqual(self.reader_uncompressed_unindexed.spectra.count, 10)
+        self.assertEqual(self.reader_compressed_indexed.spectra.count, 11)
+        self.assertEqual(self.reader_compressed_unindexed.spectra.count, 11)
+        self.assertEqual(self.reader_uncompressed_unindexed.spectra.count, 11)
+        self.assertEqual(self.reader_uncompressed_unindexed.spectra.count, 11)
 
     def test_chrom_count_chrom_file(self):
         reader = pmz.Reader(self.paths[3])

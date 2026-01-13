@@ -63,3 +63,7 @@ CHROMATOGRAM_OFFSET_PATTERN: Pattern[bytes] = re.compile(
 
 MZML_VERSION_PATTERN: Pattern[str] = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
 """Regex to extract version numbers from mzML schema location"""
+
+SPECTRUM_CONTROLLER_TYPE_PATTERN: Pattern[str] = re.compile(r"controllerType=(\d+)")
+SPECTRUM_CONTROLLER_NUMBER_PATTERN: Pattern[str] = re.compile(r"controllerNumber=(\d+)")
+SPECTRUM_SCAN_PATTERN: Pattern[str] = re.compile(r"scan=(\d+)")

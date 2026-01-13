@@ -17,19 +17,24 @@ class ChromatogramTest(unittest.TestCase):
 
     def setUp(self):
         self.paths = test_file_paths.paths
-        path = self.paths[2]
+        path = test_file_paths.get_data_file_paths(test_file_paths.DataFiles.EXAMPLE)
         self.run_np = run.Reader(path)
         self.chrom = self.run_np.TIC
+        assert self.chrom is not None
         
     def test_i(self):
         self.chrom.profile = [(1, 10), (2, 20), (3, 30)]
-        peaks = self.chrom.peaks()
-        print(self.chrom.peaks())
+        peaks = self.chrom.profile
+        print(peaks)
         self.assertPeaksIdentical(peaks, [(1, 10), (2, 20), (3, 30)])
 
     def test_profile(self):
         profile = self.chrom.profile
-        self.assertIsNotNone(len(profile))
+        time = self.chrom.time
+        intensity = self.chrom.i
+        self.assertIsNotNone(time)
+        self.assertIsNotNone(intensity)
+        self.assertIsNotNone(profile)
         if np:
             self.assertIsInstance(profile, np.ndarray)
         else:

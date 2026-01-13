@@ -3,8 +3,6 @@
 Test cases for the new functionality in pymzml.run.Reader
 related to accessing spectra and chromatograms.
 """
-from typing import Any
-
 import os
 import sys
 
@@ -13,7 +11,7 @@ sys.path.append(os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 
 import unittest
 import pymzml.run as run
-from pymzml.spec import Spectrum
+from pymzml.spectrum import Spectrum
 import test_file_paths
 
 

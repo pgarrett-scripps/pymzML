@@ -38,8 +38,8 @@ class SpectrumMS2Test(unittest.TestCase):
         self.spec = self.Run.spectra.get_by_id("spectrum=2548")
 
     def test_scan_time(self):
-        scan_time = self.spec.transform_scan_time(pmz.TimeUnit.MINUTE)[0]
-        scan_time2 = self.spec.transform_scan_time(pmz.TimeUnit.MINUTE)[0]
+        scan_time = self.spec.scan_time_minutes
+        scan_time2 = self.spec.scan_time_minutes  # Access again to test caching
         self.assertIsNotNone(scan_time)
         self.assertIsInstance(scan_time, float)
         self.assertEqual(round(scan_time, 4), round(28.96722412109367, 4))
@@ -55,11 +55,10 @@ class SpectrumMS2Test(unittest.TestCase):
         assert selected_precursor[0]["precursor id"] is None
 
     def test_ion_mode(self):
-        assert self.spec["positive scan"] is True
+        assert self.spec.negative_scan == True
 
     def test_ion_mode_non_existent(self):
-        assert self.spec["negative scan"] is None
-
+        assert self.spec.positive_scan == False
 
 if __name__ == "__main__":
     unittest.main(verbosity=3)

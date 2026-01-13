@@ -13,10 +13,10 @@ from typing import Any
 from .chromatogram import Chromatogram
 from .constants import MzMLElement, XMLNamespace
 from .file_interface import FileInterface
-from .regex_patterns import FILE_ENCODING_PATTERN, MZML_VERSION_PATTERN
+from .lookup import ChromatogramLookup, SpectrumLookup
 from .metadata import MzMLMetadata
-from .lookup import SpectrumLookup, ChromatogramLookup
-    
+from .regex_patterns import FILE_ENCODING_PATTERN, MZML_VERSION_PATTERN
+
 
 class Reader:
     """
@@ -48,9 +48,7 @@ class Reader:
                 file_name = str(path_or_file)
                 encoding = self._guess_encoding(path_or_file)  # type: ignore[arg-type]
 
-            
-
-        file_object: FileInterface = self._open_file(
+        self.file_object: FileInterface = self._open_file(
             self.path_or_file,
             build_index_from_scratch=self.build_index_from_scratch,
             encoding=encoding,
@@ -60,9 +58,9 @@ class Reader:
 
         # File info
         self.info: MzMLMetadata = MzMLMetadata(
-            file_name=file_name, 
-            encoding=encoding, 
-            file_object=file_object, 
+            file_name=file_name,
+            encoding=encoding,
+            file_object=self.file_object,
         )
 
         self.iter: Iterator[tuple[str, ElementTree.Element]] = self._init_iter()
@@ -150,10 +148,10 @@ class Reader:
         # Pass the FileInterface's underlying file handler directly
         # Use get_file_handler from the interface to ensure we have a valid text stream
         file_handle = self.info.file_object.file_handler.get_file_handler(self.info.encoding)
-        
+
         # We need to make sure we close this handle later or it might leak if not fully consumed
         # For now, relying on Python's GC for this temporary handle used for metadata parsing
-        
+
         mzml_iter: Iterator[tuple[str, ElementTree.Element]] = iter(
             ElementTree.iterparse(file_handle, events=("end", "start"))  # type: ignore[arg-type]
         )  # NOTE: end might be sufficient
@@ -181,7 +179,7 @@ class Reader:
                 case MzMLElement.CV:
                     if element.attrib.get("id") == "MS":
                         try:
-                            obo_version = element.attrib['version']  # type: ignore[call-arg]
+                            obo_version = element.attrib["version"]  # type: ignore[call-arg]
                             self.info.obo_version = obo_version
                         except KeyError:
                             pass
@@ -228,14 +226,16 @@ class Reader:
                 case _:
                     pass
 
-
         self.root.clear()
         return mzml_iter
 
     @property
-    def TIC(self) -> Chromatogram:
+    def TIC(self) -> Chromatogram | None:
         """Access the Total Ion Chromatogram (TIC)."""
-        return self.chromatograms.get_by_id("TIC")
+        try:
+            return self.file_object.TIC
+        except KeyError:
+            return None
 
     def close(self) -> None:
         self.info.file_object.close()

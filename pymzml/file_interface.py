@@ -1,35 +1,38 @@
 #!/usr/bin/env python3
 """Interface for different mzML file formats."""
+
 import gzip
 import tempfile
 from io import BytesIO
 from pathlib import Path
 from re import Pattern
-from typing import Literal, Iterator
+from typing import Iterator, Literal, overload
 from xml.etree import ElementTree as ET
-from typing import overload, Iterator
 
 from .chromatogram import Chromatogram
 from .file_classes import (
     BytesMzml,
     ChromatogramElement,
+    MzmlInterface,
+    MzmlXMLElement,
     SpectrumElement,
     StandardGzip,
     StandardMzml,
-    MzmlInterface,
-    MzmlXMLElement
 )
-from .spec import Spectrum
+from .spectrum import Spectrum
+
 
 @overload
 def convert_mzml_element_to_object(
     mzml_element: SpectrumElement,
 ) -> Spectrum: ...
 
+
 @overload
 def convert_mzml_element_to_object(
     mzml_element: ChromatogramElement,
 ) -> Chromatogram: ...
+
 
 def convert_mzml_element_to_object(
     mzml_element: SpectrumElement | ChromatogramElement,
@@ -41,6 +44,7 @@ def convert_mzml_element_to_object(
         return Chromatogram(mzml_element.element)
     else:
         raise ValueError(f"Unknown element_type: {mzml_element.element_type}")
+
 
 class FileInterface:
     """Interface to different mzML formats."""
@@ -69,9 +73,7 @@ class FileInterface:
         if self.temp_file is not None:
             self.temp_file.close()
 
-    def _open(
-        self, path_or_file: str | Path | BytesIO
-    ) -> MzmlInterface:
+    def _open(self, path_or_file: str | Path | BytesIO) -> MzmlInterface:
         """Open appropriate file handler based on file type and format."""
         # Handle BytesIO objects
         if isinstance(path_or_file, BytesIO):
@@ -80,40 +82,38 @@ class FileInterface:
                 self.encoding,
                 self.build_index_from_scratch,
             )
-        
+
         # Convert Path to string
         path = str(path_or_file) if isinstance(path_or_file, Path) else path_or_file
-        
+
         # Handle in_memory mode - load entire file into memory
         if self.in_memory:
             if path.endswith(".gz"):
                 # Decompress gzipped file into memory
-                with gzip.open(path, 'rb') as f:
+                with gzip.open(path, "rb") as f:
                     content = f.read()
             else:
                 # Read uncompressed file into memory
-                with open(path, 'rb') as f:
+                with open(path, "rb") as f:
                     content = f.read()
-            
+
             return BytesMzml(
                 BytesIO(content),
                 self.encoding,
                 self.build_index_from_scratch,
             )
-        
+
         # Handle gzipped files
         if path.endswith(".gz"):
             # Extract gzip to temporary file if requested
             if self.extract_gzip:
                 self.temp_file = tempfile.NamedTemporaryFile(
-                    mode='w+b',
-                    suffix='.mzML',
-                    delete=False
+                    mode="w+b", suffix=".mzML", delete=False
                 )
-                with gzip.open(path, 'rb') as f_in:
+                with gzip.open(path, "rb") as f_in:
                     self.temp_file.write(f_in.read())
                 self.temp_file.flush()
-                
+
                 return StandardMzml(
                     self.temp_file.name,
                     self.encoding,
@@ -122,7 +122,7 @@ class FileInterface:
                 )
             else:
                 return StandardGzip(path, self.encoding)
-        
+
         # Handle standard mzML files
         return StandardMzml(
             path,
@@ -163,7 +163,9 @@ class FileInterface:
     def _iter_xml_elements(self, tag_suffix: Literal["spectrum"]) -> Iterator[SpectrumElement]: ...
 
     @overload
-    def _iter_xml_elements(self, tag_suffix: Literal["chromatogram"]) -> Iterator[ChromatogramElement]: ...
+    def _iter_xml_elements(
+        self, tag_suffix: Literal["chromatogram"]
+    ) -> Iterator[ChromatogramElement]: ...
 
     def _iter_xml_elements(
         self, tag_suffix: Literal["spectrum", "chromatogram"]
@@ -175,14 +177,14 @@ class FileInterface:
             # We must seek to 0 for a fresh iterator
             # Note: get_file_handler usually returns a new handle at pos 0,
             # but seeking ensures it for implementations that might recycle handles.
-            if hasattr(file_handle, 'seek'):
+            if hasattr(file_handle, "seek"):
                 file_handle.seek(0)
-            
+
             # Type hint needed for iterparse iterator
             mzml_iter: Iterator[tuple[str, ET.Element]] = iter(
                 ET.iterparse(file_handle, events=("end",))
             )
-            
+
             for event, element in mzml_iter:
                 if event == "end":
                     # Extract tag suffix for matching
@@ -210,12 +212,12 @@ class FileInterface:
     def TIC(self) -> Chromatogram:
         """Retrieve the Total Ion Chromatogram (TIC)."""
         return self.get_chromatogram_by_id("TIC")
-    
+
     @property
     def spectrum_count(self) -> int | None:
         """Count of spectra in the file, if determinable."""
         return self.file_handler.spectrum_count
-    
+
     @property
     def chromatogram_count(self) -> int | None:
         """Count of chromatograms in the file, if determinable."""

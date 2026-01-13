@@ -1,11 +1,13 @@
 from functools import cached_property
-from typing import Protocol, runtime_checkable, TextIO
+from typing import Protocol, TextIO, runtime_checkable
+
 from .xml_tuple import ChromatogramElement, SpectrumElement
+
 
 @runtime_checkable
 class MzmlInterface(Protocol):
     """Protocol defining the interface for mzML file readers."""
-    
+
     def read(self, size: int = -1) -> str: ...
     def close(self) -> None: ...
     def get_file_handler(self, encoding: str) -> TextIO: ...
@@ -14,7 +16,7 @@ class MzmlInterface(Protocol):
     def get_spectrum_by_index(self, index: int) -> SpectrumElement: ...
     def get_chromatogram_by_id(self, identifier: str | int) -> ChromatogramElement: ...
     def get_chromatogram_by_index(self, index: int) -> ChromatogramElement: ...
-    
+
     @property
     def TIC(self) -> ChromatogramElement: ...
 

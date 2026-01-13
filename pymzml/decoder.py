@@ -125,3 +125,17 @@ class MSDecoder:
         elif compression == MSAccession.NUMPRESS_SLOF:
             return cls.encode_slof(data)
         raise ValueError(f"Unsupported numpress compression type: {compression}")
+
+    @classmethod
+    def decode_ztsd(cls, data: bytes) -> bytes:
+        """Decompress ztsd-compressed data."""
+        import zstd
+
+        return zstd.decompress(data)
+
+    @classmethod
+    def encode_ztsd(cls, data: bytes) -> bytes:
+        """Compress data using ztsd."""
+        import zstd
+
+        return zstd.compress(data)

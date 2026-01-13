@@ -112,7 +112,7 @@ class ChromatogramPropertiesTest(unittest.TestCase):
         print(f"\nTesting {chrom_count} chromatograms:")
 
         # Test each chromatogram
-        for i in range(chrom_count):
+        for i in range(chrom_count): # type: ignore
             chromatogram = self.reader.chromatograms[i]
 
             # Print information about the chromatogram
@@ -128,7 +128,7 @@ class ChromatogramPropertiesTest(unittest.TestCase):
             self.assertIsNotNone(chromatogram.i, "Chromatogram should have intensity data")
 
             # Verify that the peaks method returns data
-            peaks = chromatogram.peaks()
+            peaks = chromatogram.profile
             self.assertIsNotNone(peaks, "Chromatogram peaks should not be None")
 
             # Print the first few data points

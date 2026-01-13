@@ -1,4 +1,4 @@
-# PyMZML-Turbo
+# PyMZML
 
 This fork is a major refactor of pymzml. Most functionality is preserved so it should serve as a drop in replacement for the most part.
 
@@ -17,7 +17,7 @@ This fork is a major refactor of pymzml. Most functionality is preserved so it s
 
 ## General information
 
-pymzml-turbo is a fork of [pymzml](https://github.com/pymzml/pymzML) (a package to parse mzML data in Python based on cElementTree)
+This a fork of [pymzml](https://github.com/pymzml/pymzML) (a package to parse mzML data in Python based on cElementTree)
 
 pymzml Copyright 2010-2024 by:
 
@@ -65,7 +65,7 @@ print(f"Start time: {run.info.start_time}")
 
 ```python
 # Iterate through all spectra
-for spectrum in run:
+for spectrum in run.spectra:
     print(f"Spectrum {spectrum.ID}, MS level {spectrum.ms_level}")
     print(f"Retention time: {spectrum.scan_time_in_minutes():.2f} min")
     print(f"Number of peaks: {len(spectrum.peaks('raw'))}")
@@ -73,17 +73,17 @@ for spectrum in run:
 
 ### Accessing Specific Spectra
 
-Accessing spectra via `run[identifier]` or `run.get_spectrum(identifier)` interprets integers first as Native IDs, then as indices. This can be ambiguous if a spectrum has Native ID "5" but you want the 6th spectrum (index 5).
+Accessing spectra via `run.spectra[identifier]` interprets integers first as Native IDs, then as indices. This can be ambiguous if a spectrum has Native ID "5" but you want the 6th spectrum (index 5).
 
 For unambiguous access, use the specific methods:
 
 ```python
 # Unambiguous access by Native ID (str or int)
-spectrum = run.get_spectrum_by_id("spectrum_id_1")
-spectrum = run.get_spectrum_by_id(100)
+spectrum = run.spectra.get_by_id("spectrum_id_1")
+spectrum = run.spectra.get_by_id(100)
 
 # Unambiguous access by 0-based Index
-spectrum = run.get_spectrum_by_index(0)  # First spectrum
+spectrum = run.spectra.get_by_index(0)  # First spectrum
 ```
 
 ### Working with Peaks
@@ -112,9 +112,6 @@ for mz, intensity in top_peaks:
 ### Working with Chromatograms
 
 ```python
-# Enable chromatogram access during iteration
-run = pmz.Reader("data.mzML", skip_chromatogram=False)
-
 # Access TIC (Total Ion Chromatogram)
 tic = run.TIC
 print(f"TIC has {len(tic.peaks())} data points")
@@ -124,7 +121,7 @@ for time, intensity in tic.peaks():
     print(f"Time: {time:.2f}, Intensity: {intensity:.2f}")
 
 # Access by index (explicitly 0-based index)
-chromatogram = run.get_chromatogram_by_index(0)
+chromatogram = run.chromatograms.get_by_index(0)
 ```
 
 ### Extracting Ion Chromatograms (XIC/EIC)
@@ -134,7 +131,7 @@ chromatogram = run.get_chromatogram_by_index(0)
 target_mz = 445.12
 time_intensities = []
 
-for spectrum in run:
+for spectrum in run.spectra:
     if spectrum.ms_level == 1:
         peaks = spectrum.has_peak(target_mz)
         if peaks:
@@ -155,6 +152,9 @@ for rt, intensity, mz in time_intensities:
 for spectrum in run:
     if spectrum.ms_level == 2:
         precursors = spectrum.selected_precursors
+        if precurso.spectra:
+    if spectrum.ms_level == 2:
+        precursors = spectrum.selected_precursors
         if precursors:
             for precursor in precursors:
                 print(f"Precursor m/z: {precursor['mz']:.4f}")
@@ -167,10 +167,7 @@ for spectrum in run:
 ```python
 # Compare two spectra using cosine similarity
 spectra = []
-for spectrum in run:
-    if spectrum.ms_level == 1:
-        spectra.append(spectrum)
-        if len(spectra) >= 2:
+for spectrum in run.spectratra) >= 2:
             break
 
 # Calculate similarity (returns value between 0 and 1)
@@ -207,6 +204,9 @@ run = pmz.Reader("data.mzML.gz")
 for spectrum in run:
     print(spectrum.ID)
 ```
+.spectra:
+    print(spectrum.ID)
+```
 
 ### Complete Example
 
@@ -217,15 +217,15 @@ import pymzml as pmz
 run = pmz.Reader("data.mzML")
 
 # Print file summary
-print(f"File: {run.info['file_name']}")
-print(f"Total spectra: {run.info['spectrum_count']}")
+print(f"File: {run.info.file_name}")
+print(f"Total spectra: {run.info.spectrum_count}")
 print()
 
 # Analyze MS1 spectra
 ms1_count = 0
 total_peaks = 0
 
-for spectrum in run:
+for spectrum in run.spectra:
     if spectrum.ms_level == 1:
         ms1_count += 1
         peaks = spectrum.peaks('centroided')
@@ -247,8 +247,5 @@ print(f"Average peaks per MS1: {total_peaks / ms1_count:.1f}")
 ```python
 # Context manager ensures proper cleanup
 with pmz.Reader("data.mzML") as run:
-    for spectrum in run:
-        # Process spectrum
-        pass
-```
+    for spectrum in run.spectra
 

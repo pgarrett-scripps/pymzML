@@ -1,7 +1,9 @@
-from typing import Any, Iterator
-from .file_interface import FileInterface
-from dataclasses import dataclass
 import xml.etree.ElementTree as ElementTree
+from dataclasses import dataclass
+from typing import Any, Iterator
+
+from .file_interface import FileInterface
+
 
 @dataclass
 class MzMLMetadata:
@@ -73,7 +75,7 @@ class MzMLMetadata:
     @property
     def has_data_processing_list(self) -> bool:
         return self.data_processing_list_element is not None
-    
+
     def next(self) -> Any:
         """Get next item using iterator."""
         return next(iter(self))

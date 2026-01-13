@@ -4,7 +4,12 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from .constants import ChromatogramMSAccession, XMLAttribute, chromatogram_type_accessions
+from .constants import (
+    ISOLATION_WINDOW_TARGET_MZ,
+    BinaryDataArrayAccession,
+    ChromatogramType,
+    XMLAttribute,
+)
 from .msdata import MsData
 
 
@@ -25,84 +30,97 @@ class Chromatogram(MsData):
     @cached_property
     def time(self) -> NDArray[np.float64] | None:
         """Get time array. Decodes if needed. Can be set for theoretical data."""
-        return self._decode(*self._get_encoding_parameters("time array"))
+        return self.decode_binary_data_array(BinaryDataArrayAccession.TIME_ARRAY)
 
     @cached_property
     def i(self) -> NDArray[np.float64] | None:
         """Get intensity array. Decodes if needed."""
-        return self._decode(*self._get_encoding_parameters("intensity array"))
+        return self.decode_binary_data_array(BinaryDataArrayAccession.INTENSITY_ARRAY)
+
+    @property
+    def flow_rate(self) -> NDArray[np.float64] | None:
+        return self.decode_binary_data_array(BinaryDataArrayAccession.FLOW_RATE_ARRAY)
+
+    @property
+    def pressure(self) -> NDArray[np.float64] | None:
+        return self.decode_binary_data_array(BinaryDataArrayAccession.PRESSURE_ARRAY)
+
+    @property
+    def vacuum_pump_pressure(self) -> NDArray[np.float64] | None:
+        return self.decode_binary_data_array(BinaryDataArrayAccession.VACUUM_PUMP_PRESSURE)
+
+    @property
+    def temperature(self) -> NDArray[np.float64] | None:
+        return self.decode_binary_data_array(BinaryDataArrayAccession.TEMPERATURE_ARRAY)
+
+    @property
+    def wavelength(self) -> NDArray[np.float64] | None:
+        return self.decode_binary_data_array(BinaryDataArrayAccession.WAVELENGTH_ARRAY)
+
+    @property
+    def mass(self) -> NDArray[np.float64] | None:
+        return self.decode_binary_data_array(BinaryDataArrayAccession.MASS_ARRAY)
+
+    @property
+    def non_standard_data(self) -> NDArray[np.float64] | None:
+        return self.decode_binary_data_array(BinaryDataArrayAccession.NON_STANDARD_DATA_ARRAY)
 
     @cached_property
-    def profile(self) -> NDArray[np.float64]:
-        """Get chromatogram profile as (time, intensity) tuples. Can be set for theoretical data."""
+    def profile(self) -> NDArray[np.float64] | None:
+        """Get chromatogram profile as (time, intensity) tuples."""
+
         if self.time is None or self.i is None:
-            return np.empty((0, 2), dtype=np.float64)
+            return None
 
-        min_len = min(len(self.time), len(self.i))
-        return np.column_stack((self.time[:min_len], self.i[:min_len]))
+        if len(self.time) != len(self.i):
+            raise ValueError("Time and intensity arrays have different lengths.")
 
-    def peaks(self) -> NDArray[np.float64]:
-        """Return chromatogram peaks as (time, intensity) tuples. Can be set for theoretical data."""
-        return self.profile
+        return np.column_stack((self.time, self.i))
 
     @cached_property
-    def chromatogram_type(self) -> str | None:
+    def chromatogram_type(self) -> ChromatogramType | None:
         """Get chromatogram type."""
         for element in self.element.iter():
             if element.tag.endswith("}cvParam"):
                 accession = element.get(XMLAttribute.ACCESSION)
-                if accession in chromatogram_type_accessions:
-                    return element.get(XMLAttribute.NAME)
+
+                try:
+                    return ChromatogramType(accession)
+                except ValueError:
+                    continue
+
         return None
 
-    @cached_property
-    def polarity(self) -> str | None:
-        """Get polarity (positive or negative scan)."""
-        for element in self.element.iter():
-            if element.tag.endswith("}cvParam"):
-                accession = element.get(XMLAttribute.ACCESSION)
-                if accession in (
-                    ChromatogramMSAccession.POSITIVE_SCAN,
-                    ChromatogramMSAccession.NEGATIVE_SCAN,
-                ):
-                    return element.get(XMLAttribute.NAME)
+    def _get_isolation_window_mz(self, parent_tag: str) -> float | None:
+        """Extract target m/z from isolation window of precursor or product."""
+        parent = self.element.find(f".//{self.ns}{parent_tag}")
+        if parent is None:
+            return None
+
+        isolation_window = parent.find(f".//{self.ns}isolationWindow")
+        if isolation_window is None:
+            return None
+
+        # Find cvParam with target m/z accession
+        for elem in isolation_window.iter():
+            if (
+                elem.tag.endswith("}cvParam")
+                and elem.get(XMLAttribute.ACCESSION) == ISOLATION_WINDOW_TARGET_MZ
+            ):
+                if value := elem.get("value"):
+                    return float(value)
+
         return None
 
     @cached_property
     def precursor_mz(self) -> float | None:
         """Get precursor m/z value for SRM/MRM chromatograms."""
-        precursor = self.element.find(f".//{self.ns}precursor")
-        if precursor is not None:
-            isolation_window = precursor.find(f".//{self.ns}isolationWindow")
-            if isolation_window is not None:
-                for element in isolation_window.iter():
-                    if (
-                        element.tag.endswith("}cvParam")
-                        and element.get(XMLAttribute.ACCESSION)
-                        == ChromatogramMSAccession.ISOLATION_WINDOW_TARGET_MZ
-                    ):
-                        value = element.get("value")
-                        if value is not None:
-                            return float(value)
-        return None
+        return self._get_isolation_window_mz("precursor")
 
     @property
     def product_mz(self) -> float | None:
         """Get product m/z value for SRM/MRM chromatograms."""
-        product = self.element.find(f".//{self.ns}product")
-        if product is not None:
-            isolation_window = product.find(f".//{self.ns}isolationWindow")
-            if isolation_window is not None:
-                for element in isolation_window.iter():
-                    if (
-                        element.tag.endswith("}cvParam")
-                        and element.get(XMLAttribute.ACCESSION)
-                        == ChromatogramMSAccession.ISOLATION_WINDOW_TARGET_MZ
-                    ):
-                        value = element.get("value")
-                        if value is not None:
-                            return float(value)
-        return None
+        return self._get_isolation_window_mz("product")
 
     def get_chromatogram_properties(self) -> dict[str, Any]:
         """Get chromatogram properties (id, type, polarity, precursor m/z, product m/z)."""

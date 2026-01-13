@@ -1,5 +1,5 @@
-from functools import cached_property
 import gzip
+from functools import cached_property
 from typing import TextIO
 from xml.etree.ElementTree import iterparse
 
@@ -133,12 +133,11 @@ class StandardGzip(MzmlInterface):
         fh.close()
         raise IndexError(f"Chromatogram index {index} out of range [0, {current_index})")
 
-
     @property
     def TIC(self) -> ChromatogramElement:
         """Retrieve the Total Ion Chromatogram (TIC)."""
         return self.get_chromatogram_by_id("TIC")
-    
+
     @cached_property
     def spectrum_count(self) -> int | None:
         """Count of spectra in the file, if determinable."""
@@ -153,7 +152,7 @@ class StandardGzip(MzmlInterface):
 
         fh.close()
         return count
-    
+
     @cached_property
     def chromatogram_count(self) -> int | None:
         """Count of chromatograms in the file, if determinable."""

@@ -18,7 +18,7 @@ from .file_classes import (
     StandardMzml,
 )
 from .run import Reader
-from .spec import Spectrum
+from .spectrum import Spectrum
 
 __all__ = [
     "Reader",
