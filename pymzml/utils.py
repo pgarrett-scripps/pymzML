@@ -4,21 +4,6 @@ from numpy.typing import NDArray
 from .constants import NoiseMode
 
 
-def make_obo_mapping(obo: str, reversed: bool = False) -> dict[str, str]:
-    """Create ID-to-name or name-to-ID mapping from OBO file."""
-    mapping: dict[str, str] = {}
-    id: str = ""
-    with open(obo) as obo_file:
-        for line in obo_file:
-            if line.startswith("id: "):
-                id = line.split()[-1]
-            elif line.startswith("name: "):
-                mapping[id] = " ".join(line.split()[1:])
-    if reversed:
-        mapping = {y: x for x, y in mapping.items()}
-    return mapping
-
-
 def filter_range(
     arr: NDArray[np.float64],
     mz_range: tuple[float | None, float | None],

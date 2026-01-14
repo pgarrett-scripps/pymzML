@@ -31,7 +31,7 @@ class ChromatogramTest(unittest.TestCase):
     def test_profile(self):
         profile = self.chrom.profile
         time = self.chrom.time
-        intensity = self.chrom.i
+        intensity = self.chrom.intensity
         self.assertIsNotNone(time)
         self.assertIsNotNone(intensity)
         self.assertIsNotNone(profile)

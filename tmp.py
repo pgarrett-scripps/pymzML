@@ -7,10 +7,10 @@ logging.basicConfig(level=logging.DEBUG)
 
 
 reader = pmz.Reader("tests/data/example.mzML", build_index_from_scratch=True)
-print(reader.TIC)
-print(reader.TIC.profile)
-print(reader.TIC.time)
-print(reader.TIC.i)
+print("TIC", reader.TIC)
+print("TIC.profile", reader.TIC.profile)
+print("TIC.time", reader.TIC.time)
+print("TIC.i", reader.TIC.intensity)
 
 sys.exit(0)
 

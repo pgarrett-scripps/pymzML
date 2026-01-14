@@ -1,23 +1,25 @@
 """Base class for mass spectrometry data with common functionality for Spectrum and Chromatogram."""
+
+import logging
 import re
 import xml.etree.ElementTree as ElementTree
 from base64 import b64decode as b64dec
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, NamedTuple
-import logging
 
 import numpy as np
 from numpy.typing import NDArray
 
 from .constants import (
     BINARY_DECODE_DTYPES,
+    BinaryDataArrayAccession,
     BinaryDataTypeAccession,
     CompressionTypeAccessions,
     EncodingFormat,
     ScanPolarity,
     XMLAttribute,
-    XMLElement, BinaryDataArrayAccession,
+    XMLElement,
 )
 from .decoder import MSDecoder
 
@@ -29,11 +31,13 @@ class EncodingParameters(NamedTuple):
 
     def __str__(self) -> str:
         return f"EncodingParameters(data_length={len(self.data) if self.data else 0}, data_type={self.data_type.name if self.data_type else 'Unknown'}, compression={self.compression.name if self.compression else 'Unknown'})"
-    
+
     def __repr__(self) -> str:
         return str(self)
 
+
 logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class MsData:
@@ -139,14 +143,14 @@ class MsData:
         bdal = self.element.find(f"./{self.ns}{XMLElement.BINARY_DATA_ARRAY_LIST}")
         if bdal is None:
             return params_map
-        
+
         for bda_element in bdal.findall(f"./{self.ns}{XMLElement.BINARY_DATA_ARRAY}"):
             binary_data = self.binary_data_array("", bda_element)
             data_type = self.get_data_array_type("", bda_element)
             compression = self.get_compression_methods("", bda_element)
-    
+
             params = EncodingParameters(binary_data, data_type, compression)
-            
+
             for cv in bda_element.findall(f"./{self.ns}{XMLElement.CV_PARAM}"):
                 if acc := cv.get(XMLAttribute.ACCESSION):
                     try:
@@ -158,14 +162,20 @@ class MsData:
 
         return params_map
 
-    def get_encoding_parameters(self, array_type: BinaryDataArrayAccession) -> EncodingParameters | None:
+    def get_encoding_parameters(
+        self, array_type: BinaryDataArrayAccession
+    ) -> EncodingParameters | None:
         return self._encoding_parameters_map.get(array_type)
 
-    def decode_binary_data_array(self, array_type: BinaryDataArrayAccession) -> NDArray[np.float64] | None:
+    def decode_binary_data_array(
+        self, array_type: BinaryDataArrayAccession
+    ) -> NDArray[np.float64] | None:
         """Decode binary data array of specified type to numpy array."""
         encoding_params = self.get_encoding_parameters(array_type)
-        logger.debug(f"Decoding binary data array for type {array_type.name} with params {encoding_params}")
-    
+        logger.debug(
+            f"Decoding binary data array for type {array_type.name} with params {encoding_params}"
+        )
+
         if encoding_params is None:
             return None
 
@@ -254,13 +264,15 @@ class MsData:
                 return MSDecoder.decode_pic(MSDecoder.decode_ztsd(out_data))
             case _:
                 # try no compression
-                logger.warning(f"Unknown compression type: {comp}, attempting no compression decode.")
+                logger.warning(
+                    f"Unknown compression type: {comp}, attempting no compression decode."
+                )
                 try:
                     return decode_to_numpy(out_data)
                 except Exception:
                     logger.error(f"Decoding failed for unknown compression type: {comp}")
                     raise ValueError(f"Unsupported compression type: {comp}")
-                
+
         logger.error("Decoding failed for unknown reasons.")
         raise RuntimeError("Decoding failed for unknown reasons. Should not reach here.")
 

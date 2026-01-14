@@ -1,3 +1,4 @@
+import logging
 import re
 from abc import ABC, abstractmethod
 from collections import OrderedDict
@@ -6,13 +7,13 @@ from io import BytesIO, TextIOWrapper
 from re import Pattern
 from typing import BinaryIO, TextIO
 from xml.etree.ElementTree import XML
-import logging 
 
 from .. import regex_patterns
 from .interface import MzmlInterface
 from .xml_tuple import ChromatogramElement, MzmlXMLElement, SpectrumElement
 
 logger = logging.getLogger(__name__)
+
 
 class AbstractRandomAccessMzml(MzmlInterface, ABC):
     """Abstract base class for random-access mzML file readers."""
@@ -161,42 +162,40 @@ class AbstractRandomAccessMzml(MzmlInterface, ABC):
         seeker.seek(0, 2)
         file_size = seeker.tell()
         search_start = max(0, file_size - 10240)  # Last 10KB
-        
+
         seeker.seek(search_start)
         footer_data = seeker.read()
-        
+
         if match := regex_patterns.INDEX_LIST_OFFSET_PATTERN.search(footer_data):
             return int(match.group("indexListOffset").decode("utf-8"))
-        
+
         logger.warning("No index found, building from scratch for random access support")
         return None
-
 
     def _parse_index_section(self, seeker: BinaryIO, index_offset: int) -> None:
         """Parse the index section and populate offset dictionaries."""
         seeker.seek(index_offset, 0)
-        
+
         current_index_type = None
         offset_pattern = re.compile(rb'<offset idRef="([^"]*)"[^>]*>(\d+)</offset>')
         index_name_pattern = re.compile(rb'<index name="([^"]*)">')
-        
+
         for line in seeker:
             if b"</indexList>" in line:
                 break
-            
+
             # Check for new index section
             if name_match := index_name_pattern.search(line):
                 current_index_type = name_match.group(1).decode("utf-8")
                 continue
-            
+
             # Parse offset entry
             if (offset_match := offset_pattern.search(line)) and current_index_type:
                 self._add_offset_entry(
                     current_index_type,
                     offset_match.group(1).decode("utf-8"),
-                    int(offset_match.group(2).decode("utf-8"))
+                    int(offset_match.group(2).decode("utf-8")),
                 )
-
 
     def _add_offset_entry(self, index_type: str, native_id: str, offset: int) -> None:
         """Add an offset entry to the appropriate dictionary with duplicate checking."""
@@ -204,12 +203,11 @@ class AbstractRandomAccessMzml(MzmlInterface, ABC):
             if native_id in self.spectrum_offsets:
                 raise ValueError(f"Duplicate spectrum ID found in index: {native_id}")
             self.spectrum_offsets[native_id] = offset
-            
+
         elif index_type == "chromatogram":
             if native_id in self.chromatogram_offsets:
                 raise ValueError(f"Duplicate chromatogram ID found in index: {native_id}")
             self.chromatogram_offsets[native_id] = offset
-
 
     def _finalize_index(self) -> None:
         """Build key lists for fast index access."""
@@ -217,23 +215,22 @@ class AbstractRandomAccessMzml(MzmlInterface, ABC):
         self._chromatogram_keys = list(self.chromatogram_offsets.keys())
         self._validate_unique_offsets()
 
-
     def _validate_unique_offsets(self) -> None:
         """Ensure no offsets are shared between or within spectrum/chromatogram indices."""
         # Check for duplicates within spectra
         spectrum_offset_values = list(self.spectrum_offsets.values())
         if len(spectrum_offset_values) != len(set(spectrum_offset_values)):
             raise ValueError("Duplicate offsets found within spectrum index")
-        
+
         # Check for duplicates within chromatograms
         chromatogram_offset_values = list(self.chromatogram_offsets.values())
         if len(chromatogram_offset_values) != len(set(chromatogram_offset_values)):
             raise ValueError("Duplicate offsets found within chromatogram index")
-        
+
         # Check for shared offsets between spectra and chromatograms
         if shared := set(spectrum_offset_values) & set(chromatogram_offset_values):
             raise ValueError(f"Offsets shared between spectra and chromatograms: {sorted(shared)}")
-        
+
     def _build_index_from_scratch(self, seeker: BinaryIO) -> None:
         """Build index by parsing the file for spectrum/chromatogram elements."""
 

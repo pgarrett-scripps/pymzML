@@ -16,11 +16,11 @@ from .msdata import MsData
 class Chromatogram(MsData):
     def __repr__(self) -> str:
         """String representation of Chromatogram object."""
-        return f"<__main__.Chromatogram object with native ID {self.ID} at {hex(id(self))}>"
+        return f"Chromatogram(ID='{self.ID}', type='{self.chromatogram_type}')"
 
     def __str__(self) -> str:
         """String representation of Chromatogram object."""
-        return f"<__main__.Chromatogram object with native ID {self.ID} at {hex(id(self))}>"
+        return self.__repr__()
 
     @cached_property
     def ID(self) -> str | None:
@@ -33,7 +33,7 @@ class Chromatogram(MsData):
         return self.decode_binary_data_array(BinaryDataArrayAccession.TIME_ARRAY)
 
     @cached_property
-    def i(self) -> NDArray[np.float64] | None:
+    def intensity(self) -> NDArray[np.float64] | None:
         """Get intensity array. Decodes if needed."""
         return self.decode_binary_data_array(BinaryDataArrayAccession.INTENSITY_ARRAY)
 
@@ -69,13 +69,13 @@ class Chromatogram(MsData):
     def profile(self) -> NDArray[np.float64] | None:
         """Get chromatogram profile as (time, intensity) tuples."""
 
-        if self.time is None or self.i is None:
+        if self.time is None or self.intensity is None:
             return None
 
-        if len(self.time) != len(self.i):
+        if len(self.time) != len(self.intensity):
             raise ValueError("Time and intensity arrays have different lengths.")
 
-        return np.column_stack((self.time, self.i))
+        return np.column_stack((self.time, self.intensity))
 
     @cached_property
     def chromatogram_type(self) -> ChromatogramType | None:

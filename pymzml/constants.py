@@ -1,4 +1,3 @@
-from ctypes.wintypes import BYTE
 from enum import StrEnum
 
 
@@ -45,18 +44,6 @@ class BinaryDataTypeAccession(StrEnum):
     ASCII_STRING = "MS:1001479"
 
 
-class CompressionType(StrEnum):
-    """Enumeration of compression types for mzML data."""
-
-    ZLIB = "zlib"
-    ZLIB_COMPRESSION = "zlib compression"
-    NUMPRESS_LINEAR = "ms-np-linear"
-    NUMPRESS_PIC = "ms-np-pic"
-    NUMPRESS_SLOF = "ms-np-slof"
-    NUMPRESS_LINEAR_FULL = "MS-Numpress linear prediction compression"
-    NUMPRESS_SLOF_FULL = "MS-Numpress short logged float compression"
-
-
 class CompressionTypeAccessions(StrEnum):
     BYTE_SHUFFLED_ZSTD = "MS:1003781"
     MS_NUMPRESS_SHORT_LOGGED_FLOAT = "MS:1002314"
@@ -64,9 +51,9 @@ class CompressionTypeAccessions(StrEnum):
     ZLIB_COMPRESSION = "MS:1000574"
     NO_COMPRESSION = "MS:1000576"
     DICTIONARY_ENCODED_ZSTD = "MS:1003782"
-    MS_NUMPRESS_LINEAR_PREDICTION_ZLIB = (
-        "MS:1002746"  # MS-Numpress linear prediction compression followed by zlib compression
-    )
+
+    # MS-Numpress linear prediction compression followed by zlib compression
+    MS_NUMPRESS_LINEAR_PREDICTION_ZLIB = "MS:1002746"
     TRUNCATION_ZLIB = "MS:1003088"
     MS_NUMPRESS_SHORT_LOGGED_FLOAT_ZLIB = "MS:1002748"
     MS_NUMPRESS_LINEAR_PREDICTION_ZSTD = "MS:1003783"
@@ -77,14 +64,6 @@ class CompressionTypeAccessions(StrEnum):
     TRUNCATION_DELTA_PREDICTION_ZLIB = "MS:1003089"
     ZSTD_COMPRESSION = "MS:1003780"
     MS_NUMPRESS_POSITIVE_INTEGER_ZSTD = "MS:1003784"
-
-
-class MSAccession(StrEnum):
-    """Enumeration of MS ontology accessions."""
-
-    NUMPRESS_LINEAR = "MS:1002312"
-    NUMPRESS_PIC = "MS:1002313"
-    NUMPRESS_SLOF = "MS:1002314"
 
 
 class XMLAttribute(StrEnum):
@@ -119,28 +98,6 @@ class SpectrumType(StrEnum):
     CENTROID = "MS:1000127"
 
 
-class OBOKey(StrEnum):
-    """Enumeration of OBO dictionary keys."""
-
-    ID = "id"
-    NAME = "name"
-    DEFINITION = "def"
-
-
-class OBOSection(StrEnum):
-    """Enumeration of OBO file sections."""
-
-    TERM = "[Term]"
-
-
-class FileExtension(StrEnum):
-    """Enumeration of file extensions."""
-
-    GZ = ".gz"
-    OBO = ".obo"
-    MZML = ".mzml"
-
-
 class XMLTag(StrEnum):
     """Enumeration of XML tag names for parsing."""
 
@@ -150,15 +107,6 @@ class XMLTag(StrEnum):
     CHROMATOGRAM_CLOSE = "</chromatogram>"
     SPECTRUM_LIST = "<spectrumL"
     CHROMATOGRAM_LIST = "<chromatogramL"
-
-
-class SpecialID(StrEnum):
-    """Enumeration of special identifier strings."""
-
-    UNKNOWN = "unknown"
-    HEAD = "Head"
-    TAIL = "tail"
-    JUNK = "junk"
 
 
 class ScanPolarity(StrEnum):
@@ -244,16 +192,6 @@ class MzMLElement(StrEnum):
 PROTON_MASS = 1.00727646677
 ISOTOPE_AVERAGE_DIFFERENCE = 1.002
 
-# Numpress compression types set for fast lookup
-NUMPRESS_COMPRESSIONS = frozenset(
-    {
-        CompressionType.NUMPRESS_LINEAR,
-        CompressionType.NUMPRESS_PIC,
-        CompressionType.NUMPRESS_SLOF,
-        CompressionType.NUMPRESS_LINEAR_FULL,
-        CompressionType.NUMPRESS_SLOF_FULL,
-    }
-)
 
 # Data type to numpy dtype mapping
 BINARY_DECODE_DTYPES: dict[BinaryDataTypeAccession, str] = {

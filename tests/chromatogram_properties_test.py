@@ -125,7 +125,7 @@ class ChromatogramPropertiesTest(unittest.TestCase):
 
             # Verify that the chromatogram has time and intensity data
             self.assertIsNotNone(chromatogram.time, "Chromatogram should have time data")
-            self.assertIsNotNone(chromatogram.i, "Chromatogram should have intensity data")
+            self.assertIsNotNone(chromatogram.intensity, "Chromatogram should have intensity data")
 
             # Verify that the peaks method returns data
             peaks = chromatogram.profile

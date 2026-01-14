@@ -27,9 +27,9 @@ print(f"TIC chromatogram ID: {tic.ID}")
 
 # Check offset dicts
 print("\n--- Checking offset dictionaries ---")
-print(f"Spectrum offsets: {len(run.info.file_object.file_handler.spectrum_offsets)}")
-print(f"Chromatogram offsets: {len(run.info.file_object.file_handler.chromatogram_offsets)}")
-print(f"First 3 spectrum IDs: {list(run.info.file_object.file_handler.spectrum_offsets.keys())[:3]}")
-print(f"Chromatogram IDs: {list(run.info.file_object.file_handler.chromatogram_offsets.keys())}")
+print(f"Spectrum offsets: {len(run.file_object.file_handler.spectrum_offsets)}")
+print(f"Chromatogram offsets: {len(run.file_object.file_handler.chromatogram_offsets)}")
+print(f"First 3 spectrum IDs: {list(run.file_object.file_handler.spectrum_offsets.keys())[:3]}")
+print(f"Chromatogram IDs: {list(run.file_object.file_handler.chromatogram_offsets.keys())}")
 
 print("\n✅ All tests passed!")

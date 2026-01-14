@@ -25,60 +25,15 @@ from .utils import centroid_peaks_numpy, filter_noise, filter_range
 
 logger = logging.getLogger(__name__)
 
-# Example Spectrum XML:
-"""
-
-<spectrum id="spectrum=1479" index="468" defaultArrayLength="315">
-    <cvParam cvRef="MS" accession="MS:1000127" name="centroid spectrum" />
-    <cvParam cvRef="MS" accession="MS:1000511" name="ms level" value="1" />
-    <cvParam cvRef="MS" accession="MS:1000294" name="mass spectrum" />
-    <cvParam cvRef="MS" accession="MS:1000130" name="positive scan" />
-        <userParam name="base peak m/z" type="xsd:double" value="464.250061035156"/>
-        <userParam name="base peak intensity" type="xsd:double" value="2827640.25"/>
-        <userParam name="total ion current" type="xsd:double" value="16019840"/>
-        <userParam name="lowest observed m/z" type="xsd:double" value="300.000916057656"/>
-        <userParam name="highest observed m/z" type="xsd:double" value="2008.45904311778"/>
-        <userParam name="filter string" type="xsd:string" value="FTMS + p NSI Full ms [300.00-2000.00]"/>
-        <userParam name="preset scan configuration" type="xsd:string" value="1"/>
-    <scanList count="1">
-        <cvParam cvRef="MS" accession="MS:1000795" name="no combination" />
-        <scan >
-            <cvParam cvRef="MS" accession="MS:1000016" name="scan start time" value="2326.453125" unitAccession="UO:0000010" unitName="second" unitCvRef="UO" />
-            <scanWindowList count="1">
-                <scanWindow>
-                    <cvParam cvRef="MS" accession="MS:1000501" name="scan window lower limit" value="300" unitAccession="MS:1000040" unitName="m/z" unitCvRef="MS" />
-                    <cvParam cvRef="MS" accession="MS:1000500" name="scan window upper limit" value="2000" unitAccession="MS:1000040" unitName="m/z" unitCvRef="MS" />
-                </scanWindow>
-            </scanWindowList>
-        </scan>
-    </scanList>
-    <binaryDataArrayList count="2">
-        <binaryDataArray encodedLength="3360">
-            <cvParam cvRef="MS" accession="MS:1000514" name="m/z array" unitAccession="MS:1000040" unitName="m/z" unitCvRef="MS" />
-            <cvParam cvRef="MS" accession="MS:1000523" name="64-bit float" />
-            <cvParam cvRef="MS" accession="MS:1000576" name="no compression" />
-            <binary>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</binary>
-        </binaryDataArray>
-        <binaryDataArray encodedLength="1680">
-            <cvParam cvRef="MS" accession="MS:1000515" name="intensity array" unitAccession="MS:1000131" unitName="number of counts" unitCvRef="MS"/>
-            <cvParam cvRef="MS" accession="MS:1000521" name="32-bit float" />
-            <cvParam cvRef="MS" accession="MS:1000576" name="no compression" />
-            <binary>nU8uRmR8WEWg501FpuAkR20FikVFWrBFAfqWRfGfYUV5yjBFWOFZRX4/FkfGVmpGu4myRbHCwUVLAUxFClfMRske3UW9g7xFAUUYRo04g0UAwItFPMRIRcUFzUY5tZRFh/owRzA2Z0YB3xtGUWngRTWIX0WOQxJGA1NrRW57mkUlQRVGgu3TRf2wrEUOzIZGKtyRRca+MkU0fIVGgcufRS73NEV+TvlF3syiRdzDOEeOtqtFzaS+RaFJb0VOvlJF73OYRWvtjkV5KMFFCuavRZ5kNUZpGlFF0VnORaC8O0a4n4NFJIBmRgxeKUU+9qpFKjtmRcrSS0Vj+RZG/P6KRXxWoEXuFxBGyFS5RRUaDEeCvfBF8kWkRfDovkXbNolGdqJcRe4CHkZgVn5FDotCRWp0eUZpBJlFhgHrRz7EmEaJFMpG59GvRTygVUamwS5F7vQ1RcOxcEVJsV5Ft5eLRVMOpEUaKRpGsTQ0RcFyf0XoFWRFN2Q2SQsLP0VUzqFF4RiPRT5tQkgfH49GV4F9RfIRh0W2/xtG0bW4Rco+TUW8YqpFpz5URxkBpkYIFIFFKdxcRcXVdEVDIotFiQCeRc6c+UVJwytHTUKpR+YcAEd70iFGCX2jRj5+mUXr5+VGtOYeRl9gNkdNvJRF184hR3KpTUbCDqBFU24ERkqhgUUBeg5GluhNRU9vlkUbCcRFJOmgRQi1cka7aQRGbumaRdaYyEW5zDtFmsqoRcnvJkfOYe1G3qeWRZ2+NUaNqz1FXv6ZR3SfhUbLgEFGFCXcRR8exUX0Ui1KmQKwRUa5eEUkA+tFAhO5SfEMMkUBvO5ITw2jR7lC30XV/yFGyFV9RfcMR0XlRqBF0AujRYKIM0V16hVIBzkMR0pXiUVZE1RFp2FgRStmBkbVF6hGdlInRmGPhEXaODJG+ejmRcM9g0eBMSdHBOyCRpTsuEWoA7dHIgGtRt/yM0X/DdZGlSEyRmtxXUVfnc1FWOuGRa3QC0cm6RdHh9DoRam2n0XQU0VFomUkRbzvDkaVdeVG6p+iReArM0XtcUZF5agESe4CSUUvFnZI/gwNSHTz4UZGIidGNHB7RTFRb0Y1X2RFdR+fRY+RBkezxl1FFdTMRVRwikUnFKVFQ9f+RePpVUcLJvJG11YxRo0Gn0YBf69GrkbMRYGdGUYggzNFsTOXReZJ6UWdBJpFa4EgRhHMUEXkk55GGc9KRobAgUWOUYtFxKxTRmQmjUWMcspGulmmRVrfmEXVYcBFkJQ5RcEtwUhlO1RI+f/yRx8EwUW5agFHmwiWRe0qOEaEWkhFaNhARdUfVEUjv1tFHbExRSx/AUm/MJVIEjUPRlrfIkjQF1JHExqLRW+GO0bcqE5F8xM3Rchgg0UvJnNFA4hNRRlI1EVqp9pGOi7/Rt5LNEbHqHBFEH9MRkBi60XqZLZH8yw0R4loykZZX2ZFDsgmRqsBjEVmJqNFkwu1RbDFMEY1J0lFNtDHR4XFFkfWmLBFrX/bRksbSEe2XEBFkeUPRnx2+0Yo4kVG/2hiRcDOTkbzHvlFCHcyRUKVkkWFUcZF46a6RQ7ZTkWoNzpFUvDeRRNioEafXjJGOcDCRa4ff0XvbU9FFxmVRlC7HUY0TI1FiNYRSBR+1kebnCZH56B/Rtxtt0UY9BdGgNoHRiuenkV5t6FF</binary>
-        </binaryDataArray>
-    </binaryDataArrayList>
-</spectrum>
-
-"""
-
 
 class Spectrum(MsData):
     def __repr__(self) -> str:
         """String representation of Spectrum object."""
-        return f"<__main__.Spectrum object with native ID {self.ID} at {hex(id(self))}>"
+        return f"Spectrum(ID='{self.ID}', level={self.ms_level})"
 
     def __str__(self) -> str:
         """String representation of Spectrum object."""
-        return f"<__main__.Spectrum object with native ID {self.ID} at {hex(id(self))}>"
+        return self.__repr__()
 
     @lru_cache
     def __getitem__(self, accession: str) -> list[str] | None:
@@ -390,10 +345,10 @@ class Spectrum(MsData):
     @property
     def raw_peaks(self) -> NDArray[np.float64] | None:
         """Get raw peaks as numpy array without any processing."""
-        if self.mz is None or self.i is None:
+        if self.mz is None or self.intensity is None:
             return None
 
-        arr = np.stack((self.mz, self.i), axis=-1)
+        arr = np.stack((self.mz, self.intensity), axis=-1)
         return arr
 
     def peaks(
@@ -446,7 +401,7 @@ class Spectrum(MsData):
         return self.decode_binary_data_array(BinaryDataArrayAccession.MZ_ARRAY)
 
     @cached_property
-    def i(self) -> NDArray[np.float64] | None:
+    def intensity(self) -> NDArray[np.float64] | None:
         """Get intensity array from the spectrum."""
         return self.decode_binary_data_array(BinaryDataArrayAccession.INTENSITY_ARRAY)
 
