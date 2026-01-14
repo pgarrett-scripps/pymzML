@@ -1,9 +1,12 @@
+from scipy.special.tests.test_data import data
+from .versions.parser import MzMLVersion, ParserResult
 from dataclasses import dataclass
-from typing import Generic, Iterator, TypeVar
+from typing import Generic, Iterator, TypeVar, Any, cast
 
 from .chromatogram import Chromatogram
 from .file_interface import FileInterface
 from .spectrum import Spectrum
+import .versions.dclasses as ver
 
 T = TypeVar("T", Spectrum, Chromatogram)
 
@@ -12,8 +15,7 @@ T = TypeVar("T", Spectrum, Chromatogram)
 class BaseLookup(Generic[T]):
     """Base class for spectrum and chromatogram lookups."""
 
-    file_object: FileInterface
-    _count: int | None = None
+    res: ParserResult
 
     def get_by_index(self, index: int | str) -> T:
         """Get item by index."""
@@ -28,8 +30,6 @@ class BaseLookup(Generic[T]):
     @property
     def count(self) -> int | None:
         """Get count of items."""
-        if self._count is not None:
-            return self._count
         return self._get_count_impl()
 
     def __iter__(self) -> Iterator[T]:
@@ -61,20 +61,61 @@ class BaseLookup(Generic[T]):
 
 
 @dataclass
+class Spectrum2:
+    """Wrapper for Spectrum object."""
+
+    id: str
+    binary_arrays: dict[str, Any]
+
+@dataclass
 class SpectrumLookup(BaseLookup[Spectrum]):
     """Lookup interface for spectra."""
 
     def _get_by_index_impl(self, index: int) -> Spectrum:
-        return self.file_object.get_spectrum_by_index(index)
+
+
+        match self.res.version:
+            case MzMLVersion.V1_1_0:
+                mzml_obj: ver.V1_1_0_MzMl = cast(ver.V1_1_0_MzMl, self.res.mzml_object)
+                if mzml_obj.run == None:
+                    raise IndexError("No run information available.")
+                if mzml_obj.run.spectrum_list is None:
+                    raise IndexError("No spectra list available.")
+                spectrum_list = mzml_obj.run.spectrum_list
+                spec = spectrum_list.spectrum[index]
+                return Spectrum(spec)
+            case _:
+                raise NotImplementedError(f"Spectrum lookup not implemented for version {self.res.version}")
+                
+
+        if self.res.run == None:
+            raise IndexError("No run information available.")
+        if self.res.run.spectrum_list == None:
+            raise IndexError("No spectra list available.")
+        spectrum_type = self.res.spectrum_list[index]
+
 
     def _get_by_id_impl(self, identifier: str) -> Spectrum:
-        return self.file_object.get_spectrum_by_id(identifier)
+        if self.res.run == None:
+            raise IndexError("No run information available.")
+        if self.res.run.spectrum_list == None:
+            raise IndexError("No spectra list available.")
+        # use index if possible
 
     def _get_count_impl(self) -> int | None:
-        return self.file_object.spectrum_count
+        if self.res.run == None:
+            raise IndexError("No run information available.")
+        if self.res.run.spectrum_list == None:
+            raise IndexError("No spectra list available.")
+        return self.res.spectrum_list.count
 
     def _iter_impl(self) -> Iterator[Spectrum]:
-        return self.file_object.iter_spectra()
+        if self.res.run == None:
+            raise IndexError("No run information available.")
+        if self.res.run.spectrum_list == None:
+            raise IndexError("No spectra list available.")
+        for spec in self.res.run.spectrum_list:
+            pass
 
 
 @dataclass
@@ -82,18 +123,18 @@ class ChromatogramLookup(BaseLookup[Chromatogram]):
     """Lookup interface for chromatograms."""
 
     def _get_by_index_impl(self, index: int) -> Chromatogram:
-        return self.file_object.get_chromatogram_by_index(index)
+        return self.res.get_chromatogram_by_index(index)
 
     def _get_by_id_impl(self, identifier: str) -> Chromatogram:
-        return self.file_object.get_chromatogram_by_id(identifier)
+        return self.res.get_chromatogram_by_id(identifier)
 
     def _get_count_impl(self) -> int | None:
-        return self.file_object.chromatogram_count
+        return self.res.chromatogram_count
 
     def _iter_impl(self) -> Iterator[Chromatogram]:
-        return self.file_object.iter_chromatograms()
+        return self.res.iter_chromatograms()
 
     @property
     def TIC(self) -> Chromatogram:
         """Access Total Ion Chromatogram."""
-        return self.file_object.TIC
+        return self.res.TIC
